@@ -1041,7 +1041,24 @@ string ScalarCompiler::generateStaticTable(Tree sig, Tree tsize, Tree content)
 string ScalarCompiler::generateWRTbl(Tree sig, Tree tbl, Tree idx, Tree data)
 {
     string tblName(CS(tbl));
-    fClass->addExecCode(Statement(getConditionCode(sig), subst("$0[$1] = $2;", tblName, CS(idx), CS(data))));
+
+    Type t2 = getCertifiedSigType(idx);
+    Type t3 = getCertifiedSigType(data);
+    // TODO : for a bug in type caching, t->variability() is not correct.
+    // Therefore in the meantime we compute it manually. (YO 2020/03/30)
+    int var = t2->variability() | t3->variability();
+    switch (var) {
+        case kKonst:
+            fClass->addInitCode(subst("$0[$1] = $2;", tblName, CS(idx), CS(data)));
+            break;
+        case kBlock:
+            fClass->addZone2(subst("$0[$1] = $2;", tblName, CS(idx), CS(data)));
+            break;
+        default:
+            fClass->addExecCode(Statement(getConditionCode(sig), subst("$0[$1] = $2;", tblName, CS(idx), CS(data))));
+            break;
+    }
+
     return tblName;
 }
 
