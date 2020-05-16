@@ -39,7 +39,7 @@ do
         echo "Use 'skylake' to compile for Skylake CPU"
         echo "Use 'skylake_avx512' to compile for Skylake-avx512 CPU"
         echo "Use 'cannonlake' to compile for Cannonlake CPU"
-        echo "Use 'generic' to compile for Generic CPU"
+        echo "Use 'generic' to compile for generic CPU"
         echo "Use '-all' to compile for all CPUs"
         echo "Use '-multi' to compile for several CPUs and aggregate them in a 'multi' class that choose the correct one at runtime"
         echo "Use '-opt native' to activate the best compilation options for the native CPU"
@@ -61,12 +61,10 @@ do
         LLVM=true
     elif [ $p = "-multi" ]; then
         MULTI=true
-        #generic is always added
-        CPU="$CPU generic"
     elif [ $p = "-test" ]; then
         TEST=true
     elif [ $p = "-all" ]; then
-	    CPU="core2 penryn nehalem westmere sandybridge ivybridge haswell broadwell skylake skylake_avx512 cannonlake"
+	    CPU="core2 penryn nehalem westmere sandybridge ivybridge haswell broadwell skylake skylake_avx512 cannonlake generic"
     elif [[ -f "$p" ]]; then
         FILES="$FILES $p"
     elif [ ${p:0:1} = "-" ]; then
@@ -77,6 +75,12 @@ do
 
 shift
 done
+
+# If no CPU is gven, compile by default for 'generic'
+if [ -z "$CPU" ]; then
+    echo "ERROR : no CPU was given"
+    exit
+fi
 
 for p in $FILES; do
 
@@ -138,8 +142,8 @@ for p in $FILES; do
     		echo "ERROR : -test option can only be used with -multi option"
     		exit
     	fi
-    	faust -inj $dspName"multi.h" -a $FAUSTARCH/minimal.cpp -cn $dspName"multi" $p -o $dspName"multi.cpp"
-    	c++ -std=c++11 $dspName"multi.cpp" -I `llvm-config --includedir` `llvm-config --ldflags --libs all --system-libs` $dspName*".o" -o $dspName"multi"
+    	faust -inj $dspName"multi.h" -a $FAUSTARCH/minimal.cpp -cn $dspName"multi" $OPTIONS $p -o $dspName"multi.cpp"
+    	c++ -std=c++11 $dspName"multi.cpp" -dead_strip -I `llvm-config --includedir` `llvm-config --ldflags --libs all --system-libs` $dspName*".o" -o $dspName"multi"
     	echo "Run ./"$dspName"multi"" to test the program"
     fi
 

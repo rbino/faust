@@ -659,6 +659,7 @@ ValueInst* InstructionsCompiler::generateFConst(Tree sig, Tree type, const strin
             ctype, vname, o->getMaxDelay());
     }
 
+    // Special case for 'fSampleRate' parameter of the class
     int sig_type = getCertifiedSigType(sig)->nature();
     if (name == "fSampleRate") {
         pushDeclare(InstBuilder::genDecStructVar(name, genBasicFIRTyped(sig_type)));
@@ -677,9 +678,14 @@ ValueInst* InstructionsCompiler::generateFVar(Tree sig, Tree type, const string&
 {
     fContainer->addIncludeFile(file);
 
+    // Special case for 'count' parameter of the 'compute' method
     int sig_type = getCertifiedSigType(sig)->nature();
-    pushExtGlobalDeclare(InstBuilder::genDecGlobalVar(name, genBasicFIRTyped(sig_type)));
-    return generateCacheCode(sig, InstBuilder::genLoadGlobalVar(name));
+    if (name == fFullCount) {
+        return generateCacheCode(sig, InstBuilder::genLoadFunArgsVar(name));
+    } else {
+        pushExtGlobalDeclare(InstBuilder::genDecGlobalVar(name, genBasicFIRTyped(sig_type)));
+        return generateCacheCode(sig, InstBuilder::genLoadGlobalVar(name));
+    }
 }
 
 /*****************************************************************************
@@ -731,14 +737,15 @@ ValueInst* InstructionsCompiler::generateBinOp(Tree sig, int opcode, Tree a1, Tr
     ValueInst* v1 = CS(a1);
     ValueInst* v2 = CS(a2);
 
+    /*
     interval i = getCertifiedSigType(a1)->getInterval();
     interval j = getCertifiedSigType(a2)->getInterval();
-
     if (j.haszero()) {
         // potential division by zero
-        // cerr << "WARNING : potential division by zero (" << i << "/" << j << ") in " << ppsig(sig) << endl;
+        cerr << "WARNING : potential division by zero (" << i << "/" << j << ") in " << ppsig(sig) << endl;
     }
-
+    */
+     
     // Logical and shift operations work on kInt32, so cast both operands here
     if (isLogicalOpcode(opcode) || isShiftOpcode(opcode)) {
         res = InstBuilder::genBinopInst(opcode, promote2int(t1, v1), promote2int(t2, v2));
@@ -1450,8 +1457,8 @@ ValueInst* InstructionsCompiler::generateRDTbl(Tree sig, Tree tbl, Tree idx)
             if (idx_i.lo < 0 || (idx_i.hi >= tree2int(size))) {
                 stringstream error;
                 error << "ERROR : RDTbl read index [" << idx_i.lo << ":" <<idx_i.hi
-                << "] is outside of table range (" << tree2int(size) << ") in "
-                << *sig << endl;
+                      << "] is outside of table range (" << tree2int(size) << ") in "
+                      << *sig << endl;
                 if (gGlobal->gCheckTable == "cat") {
                     cerr << error.str();
                 } else {
@@ -2180,6 +2187,7 @@ void InstructionsCompiler::generateMacroInterfaceElements(const string& pathname
  * Generate user interface macros corresponding
  * to a user interface widget
  */
+
 void InstructionsCompiler::generateWidgetMacro(const string& pathname, Tree fulllabel, Tree varname, Tree sig)
 {
     Tree                      path, c, x, y, z;
@@ -2188,38 +2196,55 @@ void InstructionsCompiler::generateWidgetMacro(const string& pathname, Tree full
 
     extractMetadata(tree2str(fulllabel), label, metadata);
     string pathlabel = pathname + label;
+    string rawlabel = label;
+    std::replace(rawlabel.begin(), rawlabel.end(), ' ', '_');
 
     if (isSigButton(sig, path)) {
         fContainer->addUIMacro(subst("FAUST_ADDBUTTON(\"$0\", $1);", pathlabel, tree2str(varname)));
+        fContainer->addUIMacroActives(subst("p(BUTTON, $0, \"$1\", $2, 0.0, 0.0, 1.0, 1.0) \\", rawlabel, pathlabel, tree2str(varname)));
 
     } else if (isSigCheckbox(sig, path)) {
         fContainer->addUIMacro(subst("FAUST_ADDCHECKBOX(\"$0\", $1);", pathlabel, tree2str(varname)));
+        fContainer->addUIMacroActives(subst("p(CHECKBOX, $0, \"$1\", $2, 0.0, 0.0, 1.0, 1.0) \\", rawlabel, pathlabel, tree2str(varname)));
 
     } else if (isSigVSlider(sig, path, c, x, y, z)) {
         fContainer->addUIMacro(subst("FAUST_ADDVERTICALSLIDER(\"$0\", $1, $2, $3, $4, $5);", pathlabel,
                                      tree2str(varname), T(tree2float(c)), T(tree2float(x)), T(tree2float(y)),
                                      T(tree2float(z))));
+        fContainer->addUIMacroActives(subst("p(VERTICALSLIDER, $0, \"$1\", $2, $3, $4, $5, $6) \\", rawlabel, pathlabel,
+                                            tree2str(varname), T(tree2float(c)), T(tree2float(x)), T(tree2float(y)),
+                                            T(tree2float(z))));
 
     } else if (isSigHSlider(sig, path, c, x, y, z)) {
         fContainer->addUIMacro(subst("FAUST_ADDHORIZONTALSLIDER(\"$0\", $1, $2, $3, $4, $5);", pathlabel,
                                      tree2str(varname), T(tree2float(c)), T(tree2float(x)), T(tree2float(y)),
                                      T(tree2float(z))));
+        fContainer->addUIMacroActives(subst("p(HORIZONTALSLIDER, $0, \"$1\", $2, $3, $4, $5, $6) \\", rawlabel, pathlabel,
+                                            tree2str(varname), T(tree2float(c)), T(tree2float(x)), T(tree2float(y)),
+                                            T(tree2float(z))));
 
     } else if (isSigNumEntry(sig, path, c, x, y, z)) {
         fContainer->addUIMacro(subst("FAUST_ADDNUMENTRY(\"$0\", $1, $2, $3, $4, $5);", pathlabel, tree2str(varname),
                                      T(tree2float(c)), T(tree2float(x)), T(tree2float(y)), T(tree2float(z))));
-
+        fContainer->addUIMacroActives(subst("p(NUMENTRY, $0, \"$1\", $2, $3, $4, $5, $6) \\", rawlabel, pathlabel,
+                                            tree2str(varname), T(tree2float(c)), T(tree2float(x)), T(tree2float(y)),
+                                            T(tree2float(z))));
+        
     } else if (isSigVBargraph(sig, path, x, y, z)) {
         fContainer->addUIMacro(subst("FAUST_ADDVERTICALBARGRAPH(\"$0\", $1, $2, $3);", pathlabel, tree2str(varname),
                                      T(tree2float(x)), T(tree2float(y))));
-
+        fContainer->addUIMacroPassives(subst("p(VERTICALBARGRAPH, $0, \"$1\", $2, 0.0, $3, $4, 0.0) \\", rawlabel, pathlabel,
+                                            tree2str(varname), T(tree2float(x)), T(tree2float(y))));
+        
     } else if (isSigHBargraph(sig, path, x, y, z)) {
         fContainer->addUIMacro(subst("FAUST_ADDHORIZONTALBARGRAPH(\"$0\", $1, $2, $3);", pathlabel, tree2str(varname),
                                      T(tree2float(x)), T(tree2float(y))));
-
+        fContainer->addUIMacroPassives(subst("p(HORIZONTALBARGRAPH, $0, \"$1\", $2, 0.0, $3, $4, 0.0) \\", rawlabel, pathlabel,
+                                            tree2str(varname), T(tree2float(x)), T(tree2float(y))));
+        
     } else if (isSigSoundfile(sig, path)) {
         fContainer->addUIMacro(subst("FAUST_ADDSOUNDFILE(\"$0\", $1);", pathlabel, tree2str(varname)));
-
+        
     } else {
         throw faustexception("ERROR in generating widget code\n");
     }

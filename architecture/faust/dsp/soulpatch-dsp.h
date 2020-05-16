@@ -37,8 +37,8 @@
 
 #include "faust/dsp/dsp.h"
 #include "faust/midi/midi.h"
-#include "faust/GUI/UI.h"
-#include "faust/GUI/JSONUIDecoder.h"
+#include "faust/gui/UI.h"
+#include "faust/gui/JSONUIDecoder.h"
 #include "faust/dsp/libfaust.h"
 
 class soul_dsp_factory;
@@ -492,6 +492,7 @@ soul_dsp_factory* createSOULDSPFactoryFromFile(const std::string& filename,
 {
     try {
         soul_dsp_factory* factory = new soul_dsp_factory(filename, error_msg);
+        // Check that SOUL patch compilation works
         soulpatch_dsp dummy(factory, error_msg);
         return factory;
     } catch (...) {

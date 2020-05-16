@@ -1,25 +1,25 @@
 /************************************************************************
-    FAUST Architecture File
-    Copyright (C) 2017 GRAME, Centre National de Creation Musicale
-    ---------------------------------------------------------------------
-    This Architecture section is free software; you can redistribute it 
-    and/or modify it under the terms of the GNU General Public License 
-    as published by the Free Software Foundation; either version 3 of 
-    the License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License 
-    along with this program; If not, see <http://www.gnu.org/licenses/>.
-
-    EXCEPTION : As a special exception, you may create a larger work 
-    that contains this FAUST architecture section and distribute  
-    that work under terms of your choice, so long as this FAUST 
-    architecture section is not modified. 
-
+ FAUST Architecture File
+ Copyright (C) 2017 GRAME, Centre National de Creation Musicale
+ ---------------------------------------------------------------------
+ This Architecture section is free software; you can redistribute it
+ and/or modify it under the terms of the GNU General Public License
+ as published by the Free Software Foundation; either version 3 of
+ the License, or (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program; If not, see <http://www.gnu.org/licenses/>.
+ 
+ EXCEPTION : As a special exception, you may create a larger work
+ that contains this FAUST architecture section and distribute
+ that work under terms of your choice, so long as this FAUST
+ architecture section is not modified.
+ 
  ************************************************************************/
 
 #include <vector>
@@ -85,6 +85,7 @@
 #elif defined(FAST_TESTS)
 
 #include "dsp_scal.h"
+#include "dsp_scal_exp10.h"
 #include "dsp_vec0_32.h"
 #include "dsp_vec1_32.h"
 #include "dsp_vec0g_32.h"
@@ -100,12 +101,14 @@ using namespace std;
 
 #define ADD_DOUBLE string((sizeof(FAUSTFLOAT) == 8) ? "-double " : "")
 
+#define BUFFER_SIZE 512
+
 ofstream* gFaustbenchLog = nullptr;
 
 template <typename REAL>
 static double bench(dsp* dsp, int dsp_size, const string& name, int run, bool trace)
 {
-    measure_dsp_aux<REAL> mes(dsp, 512, 5., trace);  // Buffer_size and duration in sec of measure
+    measure_dsp_aux<REAL> mes(dsp, BUFFER_SIZE, 5., trace);  // Buffer_size and duration in sec of measure
     for (int i = 0; i < run; i++) {
         mes.measure();
         if (trace) cout << name << " : " << mes.getStats() << " " << "(DSP CPU % : " << (mes.getCPULoad() * 100) << "), DSP size : " << dsp_size << endl;
@@ -118,8 +121,11 @@ extern "C" int bench_all(const char* name, int run, bool trace)
 {
     vector<double> measures;
     vector<string> options;
-  
-    if (trace) cout << "DSP bench of " << name << " compiled in C++ running with FAUSTFLOAT = " << ((sizeof(FAUSTFLOAT) == 4) ? "float" : "double") << endl;
+    
+    if (trace) {
+        cout << "DSP bench of " << name << " compiled in C++ running with FAUSTFLOAT = " << ((sizeof(FAUSTFLOAT) == 4) ? "float" : "double") << endl;
+        cout << "Running with 'compute' called with " << BUFFER_SIZE << " samples" << endl;
+    }
     
 #if defined(ALL_TESTS)
     
@@ -259,7 +265,7 @@ extern "C" int bench_all(const char* name, int run, bool trace)
     } else {
         cout << options[pos] << endl;
     }
-  	return 1;
+    return 1;
 }
 
 #ifndef TARGET_OS_IPHONE

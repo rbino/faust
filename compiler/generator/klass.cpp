@@ -967,6 +967,8 @@ void Klass::println(int n, ostream& fout)
         tab(n, fout);
         fout << "#ifdef FAUST_UIMACROS";
         tab(n + 1, fout);
+        fout << "#define FAUST_CLASS_NAME " << "\"" << fKlassName << "\"";
+        tab(n + 1, fout);
         fout << "#define FAUST_INPUTS " << fNumInputs;
         tab(n + 1, fout);
         fout << "#define FAUST_OUTPUTS " << fNumOutputs;
@@ -976,7 +978,7 @@ void Klass::println(int n, ostream& fout)
         fout << "#define FAUST_PASSIVES " << fNumPassives;
         printlines(n + 1, fUIMacro, fout);
         tab(n, fout);
-        fout << "#endif";
+        fout << "#endif" << endl;
     }
 
     fout << endl;

@@ -29,7 +29,7 @@ OPT=""
 FAUSTFLOAT="double" # By default since Max6
 
 # path to max SDK
-#SDK=/usr/local/include/c74support/    # now declared in faustpath
+# MAXSDK is declared in faustpath
 MAXINC=$MAXSDK/max-includes
 MSPINC=$MAXSDK/msp-includes
 
@@ -87,12 +87,12 @@ do
         option
         options -osc -midi -soundfile
         option -soundfile-static "similar to -soundfile with resources in statuc mode."
-        option "-opt native|generic"  "activates the best compilation options for the native or generic CPU."
+        option "-opt native|generic" "activates the best compilation options for the native or generic CPU."
         option "-nvoices <num>"
         option "-effect <effect.dsp>"
-        option -native "   to compile for the native CPU (otherwise the 'generic' mode is used by default)"
+        option -native "to compile for the native CPU (otherwise the 'generic' mode is used by default)"
         option -universal "to generate a 64/32 bits external"
-        option -nopatch "  to deactivate patch generation"
+        option -nopatch "to deactivate patch generation"
         option "Faust options"
         exit
     fi
@@ -191,9 +191,9 @@ for p in $FILES; do
 
     # compile Faust to c++
     if [ "$EFFECT" = "" ]; then
-        faust -i -json -a $FAUSTARCH/max-msp/max-msp64.cpp $OPTIONS "$SRCDIR/$f" -o "$TMP/${f%.dsp}.cpp" || exit
+        faust -i -cn ${f%.dsp} -uim -json -a $FAUSTARCH/max-msp/max-msp64.cpp $OPTIONS "$SRCDIR/$f" -o "$TMP/${f%.dsp}.cpp" || exit
     else
-        faust -i -json -a $FAUSTARCH/max-msp/max-msp64.cpp $OPTIONS "$SRCDIR/$f" -o "$TMP/${f%.dsp}.cpp" || exit
+        faust -i -cn ${f%.dsp} -uim -json -a $FAUSTARCH/max-msp/max-msp64.cpp $OPTIONS "$SRCDIR/$f" -o "$TMP/${f%.dsp}.cpp" || exit
         faust -i -cn effect -a $FAUSTARCH/minimal-effect.cpp "$SRCDIR/$EFFECT" -o "$TMP/effect.h" || exit
     fi
 
@@ -206,7 +206,7 @@ for p in $FILES; do
     (
         cd "$TMP"
         install -d "${f%.dsp}$EXT/Contents/MacOS"
-        $CXX $CXXFLAGS -std=c++11 -mmacosx-version-min=10.9 -Wfatal-errors -framework Carbon $POLYDEFS $MIDIDEFS $SOUNDFILEDEFS $OSCDEFS -DFAUSTFLOAT=$FAUSTFLOAT -I ../../ -I$MAXINC -I$MSPINC -F$MAXINC -F$MSPINC -framework MaxAPI -framework MaxAudioAPI $UNIVERSAL $SOUNDFILELIBS $OSCLIBS -Wl,-U,_object_method_imp -Wl,-Y,1455 -bundle "${f%.dsp}.cpp" -o "${f%.dsp}$EXT/Contents/MacOS/${f%.dsp}~"
+        $CXX $CXXFLAGS -std=c++11 -mmacosx-version-min=10.9 -Wfatal-errors -framework Carbon $POLYDEFS $MIDIDEFS $SOUNDFILEDEFS $OSCDEFS -DFAUSTFLOAT=$FAUSTFLOAT -I ../../ -I"$MAXINC" -I"$MSPINC" -F"$MAXINC" -F"$MSPINC" -framework MaxAPI -framework MaxAudioAPI $UNIVERSAL $SOUNDFILELIBS $OSCLIBS -Wl,-U,_object_method_imp -Wl,-Y,1455 -bundle "${f%.dsp}.cpp" -o "${f%.dsp}$EXT/Contents/MacOS/${f%.dsp}~"
    	) > /dev/null || exit
 
     rm -rf "$SRCDIR/${f%.dsp}$EXT"

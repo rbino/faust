@@ -25,7 +25,6 @@ do
         option
         option -source "only generates the source project."
         option "Faust options"
-        echo "faust2jackrust [-source] [additional Faust options (-vec -vs 8...)] <file.dsp>"
     fi
 
     if [ $p = "-source" ]; then
@@ -50,13 +49,15 @@ for p in $FILES; do
 
     f=$(basename "$p")
     SRCDIR=$(dirname "$p")
-  
+
     # creates the dir
     dspName="${f%.dsp}-jackrust"
     rm -rf "$SRCDIR/$dspName"
 
     # create rust project
+    pushd "$SRCDIR"
     cargo new $dspName --bin
+    popd
 
     # compile Faust DSP and put in the cargo folder
     faust -a $ARCHFILE -lang rust "$SRCDIR/$f" -o "$SRCDIR/$dspName/src/main.rs"

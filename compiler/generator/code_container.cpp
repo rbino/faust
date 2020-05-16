@@ -461,6 +461,9 @@ void CodeContainer::printMacros(ostream& fout, int n)
         tab(n, fout);
         fout << "#ifdef FAUST_UIMACROS";
         tab(n + 1, fout);
+        tab(n + 1, fout);
+        fout << "#define FAUST_CLASS_NAME " << "\"" << fKlassName << "\"";
+        tab(n + 1, fout);
         fout << "#define FAUST_INPUTS " << fNumInputs;
         tab(n + 1, fout);
         fout << "#define FAUST_OUTPUTS " << fNumOutputs;
@@ -468,9 +471,23 @@ void CodeContainer::printMacros(ostream& fout, int n)
         fout << "#define FAUST_ACTIVES " << fNumActives;
         tab(n + 1, fout);
         fout << "#define FAUST_PASSIVES " << fNumPassives;
+        tab(n, fout);
         printlines(n + 1, fUIMacro, fout);
         tab(n, fout);
-        fout << "#endif";
+        tab(n, fout);
+        {
+            fout << "\t" << "#define FAUST_LIST_ACTIVES(p) \\";
+            printlines(n + 2, fUIMacroActives, fout);
+            tab(n, fout);
+            tab(n, fout);
+        }
+        {
+            fout << "\t" << "#define FAUST_LIST_PASSIVES(p) \\";
+            printlines(n + 2, fUIMacroPassives, fout);
+            tab(n, fout);
+            tab(n, fout);
+        }
+        fout << "#endif" << endl;
     }
 }
 

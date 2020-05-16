@@ -1,32 +1,34 @@
 
 /************************************************************************
-    FAUST Architecture File
-    Copyright (C) 2003-2011 GRAME, Centre National de Creation Musicale
-    ---------------------------------------------------------------------
-    This Architecture section is free software; you can redistribute it 
-    and/or modify it under the terms of the GNU General Public License 
-    as published by the Free Software Foundation; either version 3 of 
-    the License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License 
-    along with this program; If not, see <http://www.gnu.org/licenses/>.
-
-    EXCEPTION : As a special exception, you may create a larger work 
-    that contains this FAUST architecture section and distribute  
-    that work under terms of your choice, so long as this FAUST 
-    architecture section is not modified. 
-
+ FAUST Architecture File
+ Copyright (C) 2003-2011 GRAME, Centre National de Creation Musicale
+ ---------------------------------------------------------------------
+ This Architecture section is free software; you can redistribute it
+ and/or modify it under the terms of the GNU General Public License
+ as published by the Free Software Foundation; either version 3 of
+ the License, or (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program; If not, see <http://www.gnu.org/licenses/>.
+ 
+ EXCEPTION : As a special exception, you may create a larger work
+ that contains this FAUST architecture section and distribute
+ that work under terms of your choice, so long as this FAUST
+ architecture section is not modified.
+ 
  ************************************************************************/
 
 #include "faust/dsp/dsp-optimizer.h"
 #include "faust/misc.h"
 
 using namespace std;
+
+#define BUFFER_SIZE 512
 
 template <typename REAL>
 static void bench(dsp_optimizer<REAL> optimizer, const string& name, bool trace)
@@ -66,7 +68,6 @@ int main(int argc, char* argv[])
     bool is_generic = isopt(argv, "-generic");
     int run = lopt(argv, "-run", 1);
     int opt = lopt(argv, "-opt", -1);
-    int buffer_size = 1024;
     
     if (is_trace) cout << "Libfaust version : " << getCLibFaustVersion () << endl;
     
@@ -84,6 +85,8 @@ int main(int argc, char* argv[])
     int argc1 = 0;
     const char* argv1[64];
     
+    if (is_trace) cout << "Running with 'compute' called with " << BUFFER_SIZE << " samples" << endl;
+    
     if (is_trace) cout << "Compiled with additional options : ";
     for (int i = 1; i < argc-1; i++) {
         if (string(argv[i]) == "-single" || string(argv[i]) == "-generic") {
@@ -96,7 +99,7 @@ int main(int argc, char* argv[])
         if (is_trace) cout << argv[i] << " ";
     }
     if (is_trace) cout << endl;
-      
+    
     // Add library
     argv1[argc1++] = "-I";
     argv1[argc1++] = "/usr/local/share/faust";
@@ -105,7 +108,7 @@ int main(int argc, char* argv[])
     //FAUSTBENCH_LOG<string>("faustbench LLVM");
     
     string in_filename = argv[argc-1];
-   
+    
     try {
         if (is_single) {
             string error_msg;
@@ -123,26 +126,26 @@ int main(int argc, char* argv[])
             }
             
             if (is_double) {
-                measure_dsp_aux<double> mes(DSP, 512, 5.);  // Buffer_size and duration in sec of measure
+                measure_dsp_aux<double> mes(DSP, BUFFER_SIZE, 5.);  // Buffer_size and duration in sec of measure
                 for (int i = 0; i < run; i++) {
                     mes.measure();
                     if (is_trace) cout << in_filename << " : " << mes.getStats() << " " << "(DSP CPU % : " << (mes.getCPULoad() * 100) << ")" << endl;
                     FAUSTBENCH_LOG<double>(mes.getStats());
                 }
             } else {
-                measure_dsp_aux<float> mes(DSP, 512, 5.);  // Buffer_size and duration in sec of measure
+                measure_dsp_aux<float> mes(DSP, BUFFER_SIZE, 5.);  // Buffer_size and duration in sec of measure
                 for (int i = 0; i < run; i++) {
                     mes.measure();
                     if (is_trace) cout << in_filename << " : " << mes.getStats() << " " << "(DSP CPU % : " << (mes.getCPULoad() * 100) << ")" << endl;
                     FAUSTBENCH_LOG<double>(mes.getStats());
                 }
             }
-    
+            
         } else {
             if (is_double) {
-                bench(dsp_optimizer<double>(in_filename.c_str(), argc1, argv1, target, buffer_size, run, -1, is_trace), in_filename, is_trace);
+                bench(dsp_optimizer<double>(in_filename.c_str(), argc1, argv1, target, BUFFER_SIZE, run, -1, is_trace), in_filename, is_trace);
             } else {
-                bench(dsp_optimizer<float>(in_filename.c_str(), argc1, argv1, target, buffer_size, run, -1, is_trace), in_filename, is_trace);
+                bench(dsp_optimizer<float>(in_filename.c_str(), argc1, argv1, target, BUFFER_SIZE, run, -1, is_trace), in_filename, is_trace);
             }
         }
     } catch (...) {
@@ -150,5 +153,5 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
     
-  	return 0;
+    return 0;
 }

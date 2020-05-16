@@ -87,6 +87,19 @@
 #include "faust/gui/SoundUI.h"
 #endif
 
+// For FAUST_CLASS_NAME to be defined
+#define FAUST_UIMACROS
+
+// but we will ignore most of them
+#define FAUST_ADDBUTTON(l,f)
+#define FAUST_ADDCHECKBOX(l,f)
+#define FAUST_ADDVERTICALSLIDER(l,f,i,a,b,s)
+#define FAUST_ADDHORIZONTALSLIDER(l,f,i,a,b,s)
+#define FAUST_ADDNUMENTRY(l,f,i,a,b,s)
+#define FAUST_ADDVERTICALBARGRAPH(l,f,a,b)
+#define FAUST_ADDHORIZONTALBARGRAPH(l,f,a,b)
+#define FAUST_ADDSOUNDFILE(s,f)
+
 using namespace std;
 
 /******************************************************************************
@@ -117,10 +130,10 @@ using namespace std;
 #include "jpatcher_api.h"
 #include <string.h>
 
-#define ASSIST_INLET 	1  	/* should be defined somewhere ?? */
-#define ASSIST_OUTLET 	2	/* should be defined somewhere ?? */
+#define ASSIST_INLET 	1
+#define ASSIST_OUTLET 	2
 
-#define EXTERNAL_VERSION    "0.71"
+#define EXTERNAL_VERSION    "0.75"
 #define STR_SIZE            512
 
 #include "faust/gui/GUI.h"
@@ -131,6 +144,9 @@ using namespace std;
 std::list<GUI*> GUI::fGuiList;
 ztimedmap GUI::gTimedZoneMap;
 
+static t_class* faust_class;
+
+/*--------------------------------------------------------------------------*/
 static const char* getCodeSize()
 {
     int tmp;
@@ -167,8 +183,6 @@ typedef struct faust
 #endif
 } t_faust;
 
-void* faust_class;
-
 void faust_create_jsui(t_faust* x);
 void faust_make_json(t_faust* x);
 
@@ -177,7 +191,7 @@ void faust_allocate(t_faust* x, int nvoices)
 {
     // Delete old
     delete x->m_dsp;
-    if (x->m_dspUI) x->m_dspUI->clear();
+    x->m_dspUI->clear();
     
     if (nvoices > 0) {
         post("polyphonic DSP voices = %d", nvoices);
@@ -198,7 +212,7 @@ void faust_allocate(t_faust* x, int nvoices)
 #ifdef MIDICTRL
     x->m_dsp->buildUserInterface(x->m_midiUI);
 #endif
-
+  
     // Possible sample adaptation
     if (sizeof(FAUSTFLOAT) == 4) {
         x->m_dsp = new dsp_sample_adapter<FAUSTFLOAT, double>(x->m_dsp);
@@ -403,7 +417,7 @@ void* faust_new(t_symbol* s, short ac, t_atom* av)
     MidiMeta::analyse(tmp_dsp, midi_sync, nvoices);
     delete tmp_dsp;
     
-    t_faust* x = (t_faust*)newobject(faust_class);
+    t_faust* x = (t_faust*)object_alloc(faust_class);
     
     x->m_savedUI = new SaveLabelUI();
     x->m_dspUI = NULL;
@@ -417,12 +431,13 @@ void* faust_new(t_symbol* s, short ac, t_atom* av)
     x->m_midiUI = new MidiUI(x->m_midiHandler);
 #endif
     
+    x->m_dspUI = new mspUI();
+    
     faust_allocate(x, nvoices);
     
     x->m_Inputs = x->m_dsp->getNumInputs();
     x->m_Outputs = x->m_dsp->getNumOutputs();
-   
-    x->m_dspUI = new mspUI();
+    
     x->m_control_outlet = outlet_new((t_pxobject*)x, (char*)"list");
 
     // Initialize at the system's sampling rate
@@ -482,6 +497,10 @@ void* faust_new(t_symbol* s, short ac, t_atom* av)
     
     // Display controls
     x->m_dspUI->displayControls();
+    
+    // Get attributes values
+    attr_args_process(x, ac, av);
+    
     return x;
 }
 
@@ -539,50 +558,50 @@ void faust_osc(t_faust* x, t_symbol* s, short ac, t_atom* av)
 #endif
 
 /*--------------------------------------------------------------------------*/
-// Reset controllers to init value and send [label, init, min, max]
+// Reset controllers to init value and send [path, init, min, max]
 void faust_init(t_faust* x, t_symbol* s, short ac, t_atom* av)
 {
     // Reset internal state
     x->m_savedUI->reset();
     
     // Input controllers
-    for (mspUI::iterator it = x->m_dspUI->begin1(); it != x->m_dspUI->end1(); it++) {
+    for (mspUI::iterator it = x->m_dspUI->begin2(); it != x->m_dspUI->end2(); it++) {
         t_atom myList[4];
         atom_setsym(&myList[0], gensym((*it).first.c_str()));
-        atom_setfloat(&myList[1], (*it).second->getInitValue());
+        atom_setfloat(&myList[1], (*it).second->getInitValue());    // init value
         atom_setfloat(&myList[2], (*it).second->getMinValue());
         atom_setfloat(&myList[3], (*it).second->getMaxValue());
         outlet_list(x->m_control_outlet, 0, 4, myList);
     }
     // Output controllers
-    for (mspUI::iterator it = x->m_dspUI->begin3(); it != x->m_dspUI->end3(); it++) {
+    for (mspUI::iterator it = x->m_dspUI->begin4(); it != x->m_dspUI->end4(); it++) {
         t_atom myList[4];
         atom_setsym(&myList[0], gensym((*it).first.c_str()));
-        atom_setfloat(&myList[1], (*it).second->getInitValue());
+        atom_setfloat(&myList[1], (*it).second->getInitValue());    // init value
         atom_setfloat(&myList[2], (*it).second->getMinValue());
         atom_setfloat(&myList[3], (*it).second->getMaxValue());
         outlet_list(x->m_control_outlet, 0, 4, myList);
     }
-}
+ }
 
 /*--------------------------------------------------------------------------*/
-// Dump controllers as list of: [label, cur, init, min, max]
+// Dump controllers as list of: [path, cur, init, min, max]
 void faust_dump(t_faust* x, t_symbol* s, short ac, t_atom* av)
 {
     // Input controllers
-    for (mspUI::iterator it = x->m_dspUI->begin1(); it != x->m_dspUI->end1(); it++) {
+    for (mspUI::iterator it = x->m_dspUI->begin2(); it != x->m_dspUI->end2(); it++) {
         t_atom myList[4];
         atom_setsym(&myList[0], gensym((*it).first.c_str()));
-        atom_setfloat(&myList[1], (*it).second->getValue());
+        atom_setfloat(&myList[1], (*it).second->getValue());    // cur value
         atom_setfloat(&myList[2], (*it).second->getMinValue());
         atom_setfloat(&myList[3], (*it).second->getMaxValue());
         outlet_list(x->m_control_outlet, 0, 4, myList);
     }
     // Output controllers
-    for (mspUI::iterator it = x->m_dspUI->begin3(); it != x->m_dspUI->end3(); it++) {
+    for (mspUI::iterator it = x->m_dspUI->begin4(); it != x->m_dspUI->end4(); it++) {
         t_atom myList[4];
         atom_setsym(&myList[0], gensym((*it).first.c_str()));
-        atom_setfloat(&myList[1], (*it).second->getValue());
+        atom_setfloat(&myList[1], (*it).second->getValue());    // cur value
         atom_setfloat(&myList[2], (*it).second->getMinValue());
         atom_setfloat(&myList[3], (*it).second->getMaxValue());
         outlet_list(x->m_control_outlet, 0, 4, myList);
@@ -685,34 +704,66 @@ void faust_dsp64(t_faust* x, t_object* dsp64, short* count, double samplerate, l
 }
 
 /*--------------------------------------------------------------------------*/
-extern "C" int main(void)
+t_max_err faust_attr_set(t_faust* x, t_object* attr, long ac, t_atom* av)
 {
-    setup((t_messlist**)&faust_class, (method)faust_new, (method)faust_free,
-          (short)sizeof(t_faust), 0L, A_DEFFLOAT, 0);
+    if (ac && av) {
+        t_symbol* attrname = (t_symbol*)object_method(attr, gensym("getname"));
+        // Redirect on the generic message handling method
+        faust_anything(x, attrname, ac, av);
+    }
+    return MAX_ERR_NONE;
+}
 
-    dsp* tmp_dsp = new mydsp();
-    mspUI m_dspUI;
-    tmp_dsp->buildUserInterface(&m_dspUI);
-
-    // 03/11/14 : use 'anything' to handle all parameter changes
-    addmess((method)faust_anything, (char*)"anything", A_GIMME, 0);
-    addmess((method)faust_polyphony, (char*)"polyphony", A_GIMME, 0);
+/*--------------------------------------------------------------------------*/
+#ifdef _WIN32
+extern "C" int main(void)
+#else
+void ext_main(void* r)
+#endif
+{
+    string class_name = string(FAUST_CLASS_NAME) + "~";
+    t_class* c = class_new(class_name.c_str(), (method)faust_new, (method)faust_free, sizeof(t_faust), 0L, A_GIMME, 0);
+    
+    class_addmethod(c, (method)faust_anything, "anything", A_GIMME, 0);
+    class_addmethod(c, (method)faust_polyphony, "polyphony", A_GIMME, 0);
 #ifdef OSCCTRL
-    addmess((method)faust_osc, (char*)"osc", A_GIMME, 0);
+    class_addmethod(c, (method)faust_osc, "osc", A_GIMME, 0);
 #endif
-    addmess((method)faust_init, (char*)"init", A_GIMME, 0);
-    addmess((method)faust_dump, (char*)"dump", A_GIMME, 0);
+    class_addmethod(c, (method)faust_init, "init", A_GIMME, 0);
+    class_addmethod(c, (method)faust_dump, "dump", A_GIMME, 0);
 #ifdef MIDICTRL
-    addmess((method)faust_midievent, (char*)"midievent", A_GIMME, 0);
+    class_addmethod(c, (method)faust_midievent, "midievent", A_GIMME, 0);
 #endif
-    addmess((method)faust_dsp64, (char*)"dsp64", A_CANT, 0);
-    addmess((method)faust_dblclick, (char*)"dblclick", A_CANT, 0);
-    addmess((method)faust_assist, (char*)"assist", A_CANT, 0);
-    addmess((method)faust_mute, (char*)"mute", A_GIMME, 0);
-    dsp_initclass();
+    class_addmethod(c, (method)faust_dsp64, "dsp64", A_CANT, 0);
+    class_addmethod(c, (method)faust_dblclick, "dblclick", A_CANT, 0);
+    class_addmethod(c, (method)faust_assist, "assist", A_CANT, 0);
+    class_addmethod(c, (method)faust_mute, "mute", A_GIMME, 0);
+    
+    dsp* tmp_dsp = new mydsp();
+    mspUI tmp_UI;
+    tmp_dsp->buildUserInterface(&tmp_UI);
+    
+    // Setup attributes
+    int i = 0;
+    if (sizeof(FAUSTFLOAT) == 4) {
+        for (mspUI::iterator it = tmp_UI.begin1(); it != tmp_UI.end1(); it++, i++) {
+            CLASS_ATTR_FLOAT(c, (*it).first.c_str(), 0, t_faust, m_ob);
+            CLASS_ATTR_ACCESSORS(c, (*it).first.c_str(), NULL, (method)faust_attr_set);
+        }
+    } else {
+        for (mspUI::iterator it = tmp_UI.begin1(); it != tmp_UI.end1(); it++, i++) {
+            CLASS_ATTR_DOUBLE(c, (*it).first.c_str(), 0, t_faust, m_ob);
+            CLASS_ATTR_ACCESSORS(c, (*it).first.c_str(), NULL, (method)faust_attr_set);
+        }
+    }
+    
+    class_dspinit(c);
+    class_register(CLASS_BOX, c);
+    faust_class = c;
 
     post((char*)"Faust DSP object v%s (sample = %s bits code = %s)", EXTERNAL_VERSION, ((sizeof(FAUSTFLOAT) == 4) ? "32" : "64"), getCodeSize());
     post((char*)"Copyright (c) 2012-2020 Grame");
+    
     Max_Meta1 meta1;
     tmp_dsp->metadata(&meta1);
     if (meta1.fCount > 0) {
@@ -721,9 +772,10 @@ extern "C" int main(void)
         tmp_dsp->metadata(&meta2);
         post("------------------------------");
     }
-    
     delete(tmp_dsp);
+#ifdef _WIN32
     return 0;
+#endif
 }
 
 /********************END ARCHITECTURE SECTION (part 2/2)****************/

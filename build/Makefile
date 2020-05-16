@@ -11,7 +11,7 @@ system := $(shell echo $(system) | grep MINGW > /dev/null && echo MINGW || echo 
 # output directories
 FAUSTDIR ?= faustdir
 IOSDIR   := iosdir
-VERSION := 2.23.5
+VERSION := 2.23.10
 
 #===============================================================
 # current generator and backends
@@ -318,7 +318,7 @@ checkemcc:
 #===============================================================
 installLog := $(FAUSTDIR)/install_manifest.txt
 install:
-	git submodule update --init
+	if test -d ../.git; then git submodule update --init; fi
 	cd $(FAUSTDIR) && cmake .. -DCMAKE_INSTALL_PREFIX=$(PREFIX)
 	cmake  --build $(FAUSTDIR) --target install
 uninstall: installedfiles = $(shell cat $(installLog))

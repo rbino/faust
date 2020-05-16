@@ -179,7 +179,7 @@ int main(int argc, char* argv[])
     }
 #endif
     
-    if (DSP == 0) {
+    if (!DSP) {
         std::cerr << "Unable to allocate Faust DSP object" << std::endl;
         exit(1);
     }
@@ -275,6 +275,11 @@ int main(int argc, char* argv[])
     
     audio.stop();
     finterface.saveState(rcfilename);
+    
+    delete DSP;
+#ifdef MIDICTRL
+    delete midiinterface;
+#endif
     
     return 0;
 }

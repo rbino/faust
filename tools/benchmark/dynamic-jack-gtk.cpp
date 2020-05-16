@@ -1,25 +1,25 @@
 /************************************************************************
-    FAUST Architecture File
-    Copyright (C) 2016 GRAME, Centre National de Creation Musicale
-    ---------------------------------------------------------------------
-    This Architecture section is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    as published by the Free Software Foundation; either version 3 of
-    the License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program; If not, see <http://www.gnu.org/licenses/>.
-
-    EXCEPTION : As a special exception, you may create a larger work
-    that contains this FAUST architecture section and distribute
-    that work under terms of your choice, so long as this FAUST
-    architecture section is not modified.
-
+ FAUST Architecture File
+ Copyright (C) 2016 GRAME, Centre National de Creation Musicale
+ ---------------------------------------------------------------------
+ This Architecture section is free software; you can redistribute it
+ and/or modify it under the terms of the GNU General Public License
+ as published by the Free Software Foundation; either version 3 of
+ the License, or (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program; If not, see <http://www.gnu.org/licenses/>.
+ 
+ EXCEPTION : As a special exception, you may create a larger work
+ that contains this FAUST architecture section and distribute
+ that work under terms of your choice, so long as this FAUST
+ architecture section is not modified.
+ 
  ************************************************************************/
 
 #include <libgen.h>
@@ -30,10 +30,10 @@
 #include <vector>
 
 /*
-#ifndef FAUSTFLOAT
-#define FAUSTFLOAT double
-#endif
-*/
+ #ifndef FAUSTFLOAT
+ #define FAUSTFLOAT double
+ #endif
+ */
 
 #include "faust/audio/jack-dsp.h"
 #include "faust/dsp/dsp-optimizer.h"
@@ -49,6 +49,7 @@
 #include "faust/gui/httpdUI.h"
 #include "faust/gui/OSCUI.h"
 #include "faust/gui/SoundUI.h"
+#include "faust/gui/PrintUI.h"
 #include "faust/misc.h"
 
 #include "faust/dsp/llvm-dsp-adapter.h"
@@ -102,7 +103,7 @@ int main(int argc, char* argv[])
     snprintf(name, 255, "%s", basename(argv[0]));
     snprintf(filename, 255, "%s", basename(argv[argc-1]));
     snprintf(rcfilename, 255, "%s/.%s-%src", home, name, filename);
-  
+    
     bool is_llvm = isopt(argv, "-llvm");
     bool is_interp = isopt(argv, "-interp");
     bool is_midi = isopt(argv, "-midi");
@@ -190,28 +191,27 @@ int main(int argc, char* argv[])
             factory = readDSPFactoryFromBitcodeFile(argv[argc-1], "", error_msg, -1);
         }
         
-        
         if (!factory) {
             cerr << error_msg;
             cout << "Trying to use readDSPFactoryFromMachineFile..." << endl;
             factory = readDSPFactoryFromMachineFile(argv[argc-1], "", error_msg);
         }
-  
+        
         //cout << "getDSPMachineTarget " << getDSPMachineTarget() << endl;
         
         /*
-        // Test Write/Read
-        string path_name = factory->getName();
-        
-        cout << "Test writeDSPFactoryToBitcodeFile/readDSPFactoryFromBitcodeFile" << endl;
-        writeDSPFactoryToBitcodeFile(static_cast<llvm_dsp_factory*>(factory), path_name);
-        deleteDSPFactory(static_cast<llvm_dsp_factory*>(factory));
-        factory = readDSPFactoryFromBitcodeFile(path_name, "", -1);
-        cout << "getCompileOptions " << factory->getCompileOptions() << endl;
-        
-        printList(factory->getLibraryList());
-        printList(factory->getIncludePathnames());
-        */
+         // Test Write/Read
+         string path_name = factory->getName();
+         
+         cout << "Test writeDSPFactoryToBitcodeFile/readDSPFactoryFromBitcodeFile" << endl;
+         writeDSPFactoryToBitcodeFile(static_cast<llvm_dsp_factory*>(factory), path_name);
+         deleteDSPFactory(static_cast<llvm_dsp_factory*>(factory));
+         factory = readDSPFactoryFromBitcodeFile(path_name, "", -1);
+         cout << "getCompileOptions " << factory->getCompileOptions() << endl;
+         
+         printList(factory->getLibraryList());
+         printList(factory->getIncludePathnames());
+         */
         
     } else {
         cout << "Using interpreter backend" << endl;
@@ -232,7 +232,7 @@ int main(int argc, char* argv[])
     
     cout << "getCompileOptions " << factory->getCompileOptions() << endl;
     printList(factory->getLibraryList());
-    printList(factory->getIncludePathnames());    
+    printList(factory->getIncludePathnames());
     
     //factory->setMemoryManager(&manager);  causes crash in -fm mode
     DSP = factory->createDSPInstance();
@@ -241,11 +241,11 @@ int main(int argc, char* argv[])
     //DSP = new mydsp();
     
     /*
-    measure_dsp* mes = new measure_dsp(DSP->clone(), 512, 5.);  // Buffer_size and duration in sec of measure
-    for (int i = 0; i < 2; i++) {
+     measure_dsp* mes = new measure_dsp(DSP->clone(), 512, 5.);  // Buffer_size and duration in sec of measure
+     for (int i = 0; i < 2; i++) {
         mes->measure();
         cout << argv[argc-1] << " : " << mes->getStats() << " " << "(DSP CPU % : " << (mes->getCPULoad() * 100) << ")" << endl;
-    }
+     }
     */
     
     // To test compiled block reuse
@@ -262,7 +262,7 @@ int main(int argc, char* argv[])
     // Before reading the -nvoices parameter
     MidiMeta::analyse(DSP, midi_sync, nvoices);
     nvoices = lopt(argv, "-nvoices", nvoices);
-   
+    
     if (nvoices > 0) {
         cout << "Starting polyphonic mode 'nvoices' : " << nvoices << " and 'all' : " << is_all << endl;
         DSP = dsp_poly = new mydsp_poly(DSP, nvoices, !is_all, true);
@@ -272,7 +272,7 @@ int main(int argc, char* argv[])
         cout << "Running in double..." << endl;
         DSP = new dsp_sample_adapter<double, float>(DSP);
     }
-   
+    
     GUI* interface = new GTKUI(filename, &argc, &argv);
     DSP->buildUserInterface(interface);
     
@@ -294,11 +294,14 @@ int main(int argc, char* argv[])
     if (dsp_poly) dsp_poly->setGroup(false);
     DSP->buildUserInterface(soundinterface);
     if (dsp_poly) dsp_poly->setGroup(true);
-   
+    
     if (is_httpd) {
         httpdinterface = new httpdUI(name, DSP->getNumInputs(), DSP->getNumOutputs(), argc, argv);
         DSP->buildUserInterface(httpdinterface);
     }
+    
+    //PrintUI print_ui;
+    //DSP->buildUserInterface(&print_ui);
     
     if (is_osc) {
         oscinterface = new OSCUI(filename, argc, argv);
@@ -317,11 +320,11 @@ int main(int argc, char* argv[])
     // State (after UI construction)
     finterface->recallState(rcfilename);
     audio.start();
-
+    
     if (is_httpd) {
         httpdinterface->run();
     }
-
+    
     if (is_osc) {
         oscinterface->run();
     }
@@ -331,7 +334,7 @@ int main(int argc, char* argv[])
     }
     
     interface->run();
-
+    
     audio.stop();
     
     finterface->saveState(rcfilename);
@@ -345,7 +348,7 @@ int main(int argc, char* argv[])
     delete soundinterface;
     
     //delete mes;
-  
+    
     if (is_llvm) {
         deleteDSPFactory(static_cast<llvm_dsp_factory*>(factory));
     } else {
