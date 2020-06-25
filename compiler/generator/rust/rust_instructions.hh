@@ -589,6 +589,9 @@ class RustInstVisitor : public TextInstVisitor {
     static void cleanup() { gFunctionSymbolTable.clear(); }
 };
 
+/**
+ * Helper visitor that allows to build a parameter lookup table.
+ */
 class UserInterfaceParameterMapping : public InstVisitor {
    private:
     map<string, int>      fParameterLookup;
@@ -624,8 +627,6 @@ class UserInterfaceParameterMapping : public InstVisitor {
                 fParameterLookup[inst->fZone] = fParameterIndex++;
             }
         }
-        std::cout << "visited AddMetaDeclareInst\n";
-        std::cout << fParameterLookup.size() << "\n";
     }
 
     virtual void visit(AddButtonInst* inst)
@@ -633,8 +634,6 @@ class UserInterfaceParameterMapping : public InstVisitor {
         if (fParameterLookup.find(inst->fZone) == fParameterLookup.end()) {
             fParameterLookup[inst->fZone] = fParameterIndex++;
         }
-        std::cout << "visited AddButtonInst\n";
-        std::cout << fParameterLookup.size() << "\n";
     }
 
     virtual void visit(AddSliderInst* inst)
@@ -642,8 +641,6 @@ class UserInterfaceParameterMapping : public InstVisitor {
         if (fParameterLookup.find(inst->fZone) == fParameterLookup.end()) {
             fParameterLookup[inst->fZone] = fParameterIndex++;
         }
-        std::cout << "visited AddSliderInst\n";
-        std::cout << fParameterLookup.size() << "\n";
     }
 
     virtual void visit(AddBargraphInst* inst)
@@ -651,12 +648,13 @@ class UserInterfaceParameterMapping : public InstVisitor {
         if (fParameterLookup.find(inst->fZone) == fParameterLookup.end()) {
             fParameterLookup[inst->fZone] = fParameterIndex++;
         }
-        std::cout << "visited AddBargraphInst\n";
-        std::cout << fParameterLookup.size() << "\n";
     }
 
 };
 
+/**
+ * Visitor for building user interface instructions based on the parameter lookup table.
+ */
 class RustUIInstVisitor : public TextInstVisitor {
    private:
     map<string, int>      fParameterLookup;
