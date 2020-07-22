@@ -22,10 +22,19 @@
 #ifndef _RUST_INSTRUCTIONS_H
 #define _RUST_INSTRUCTIONS_H
 
+#include <regex>
+
 #include "text_instructions.hh"
 #include "Text.hh"
 
 using namespace std;
+
+inline string makeNameSingular(const string& name) {
+    string result = name;
+    result = std::regex_replace(result, std::regex("inputs"), "input");
+    result = std::regex_replace(result, std::regex("outputs"), "output");
+    return result;
+}
 
 // Visitor used to initialize fields into the DSP constructor
 struct RustInitFieldsVisitor : public DispatchVisitor {
@@ -247,7 +256,12 @@ class RustInstVisitor : public TextInstVisitor {
             *fOut << "let mut ";
         }
 
-        *fOut << fTypeManager->generateType(inst->fType, inst->fAddress->getName());
+        // If type is kNoType, only generate the name, otherwise a typed expression
+        if (inst->fType->getType() == Typed::VarType::kNoType) {
+            *fOut << inst->fAddress->getName();
+        } else {
+            *fOut << fTypeManager->generateType(inst->fType, inst->fAddress->getName());
+        }
 
         if (inst->fValue) {
             *fOut << " = ";
@@ -258,6 +272,71 @@ class RustInstVisitor : public TextInstVisitor {
         }
 
         EndLine((inst->fAddress->getAccess() & Address::kStruct) ? ',' : ';');
+    }
+
+    virtual void visit(DeclareBufferIteratorsRust* inst)
+    {
+        /* Generates an expression like:
+        let (outputs0, outputs1) = if let [outputs0, outputs1, ..] = outputs {
+            let outputs0 = outputs0[..count as usize].iter_mut();
+            let outputs1 = outputs1[..count as usize].iter_mut();
+            (outputs0, outputs1)
+        } else {
+            panic!("wrong number of outputs");
+        };
+        */
+        std::string name = inst->fBufferName;
+
+        // Build pattern matching + if let line
+        *fOut << "let (";
+        for (int i = 0; i < inst->fNumChannels; ++i) {
+            if (i > 0) {
+                *fOut << ", ";
+            }
+            *fOut << name << i;
+        }
+        *fOut << ") = if let [";
+        for (int i = 0; i < inst->fNumChannels; ++i) {
+            *fOut << name << i << ", ";
+        }
+        *fOut << "..] = " << name << " {";
+
+        // Build fixed size iterator variables
+        fTab++;
+        for (int i = 0; i < inst->fNumChannels; ++i) {
+            tab(fTab, *fOut);
+            *fOut << "let " << name << i << " = " << name << i << "[..count as usize]";
+            if (inst->fMutable) {
+                *fOut << ".iter_mut();";
+            } else {
+                *fOut << ".iter();";
+            }
+        }
+
+        // Build return tuple
+        tab(fTab, *fOut);
+        *fOut << "(";
+        for (int i = 0; i < inst->fNumChannels; ++i) {
+            if (i > 0) {
+                *fOut << ", ";
+            }
+            *fOut << name << i;
+        }
+        *fOut << ")";
+
+        // Build else branch
+        fTab--;
+        tab(fTab, *fOut);
+        *fOut << "} else {";
+
+        fTab++;
+        tab(fTab, *fOut);
+        *fOut << "panic!(\"wrong number of " << name << "\");";
+
+        fTab--;
+        tab(fTab, *fOut);
+        *fOut << "};";
+        tab(fTab, *fOut);
     }
 
     virtual void visit(DeclareFunInst* inst)
@@ -513,6 +592,42 @@ class RustInstVisitor : public TextInstVisitor {
             inst->fUpperBound->accept(this);
         }
         *fOut << " {";
+        fTab++;
+        tab(fTab, *fOut);
+        inst->fCode->accept(this);
+        fTab--;
+        back(1, *fOut);
+        *fOut << "}";
+        tab(fTab, *fOut);
+    }
+
+    virtual void visit(IteratorForLoopInst* inst)
+    {
+        // Don't generate empty loops...
+        if (inst->fCode->size() == 0) return;
+
+        *fOut << "let zipped_iterators = ";
+        for (std::size_t i = 0; i < inst->fIterators.size(); ++i) {
+            if (i == 0) {
+                inst->fIterators[i]->accept(this);
+            } else {
+                *fOut << ".zip(";
+                inst->fIterators[i]->accept(this);
+                *fOut << ")";
+            }
+        }
+        *fOut << ";";
+        tab(fTab, *fOut);
+
+        *fOut << "for ";
+        for (std::size_t i = 0; i < inst->fIterators.size() - 1; ++i) {
+            *fOut << "(";
+        }
+        *fOut << makeNameSingular(inst->fIterators[0]->getName());
+        for (std::size_t i = 1; i < inst->fIterators.size(); ++i) {
+            *fOut << ", " << makeNameSingular(inst->fIterators[i]->getName()) << ")";
+        }
+        *fOut << " in zipped_iterators {";
         fTab++;
         tab(fTab, *fOut);
         inst->fCode->accept(this);
