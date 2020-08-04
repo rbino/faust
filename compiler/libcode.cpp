@@ -370,12 +370,12 @@ static bool processCmdline(int argc, const char* argv[])
             gGlobal->gBalancedSwitch = 2;
             i += 1;
 
-        } else if (isCmd(argv[i], "-lt", "--less-temporaries")) {
-            gGlobal->gLessTempSwitch = true;
-            i += 1;
-
         } else if (isCmd(argv[i], "-mcd", "--max-copy-delay") && (i + 1 < argc)) {
             gGlobal->gMaxCopyDelay = std::atoi(argv[i + 1]);
+            i += 2;
+            
+        } else if (isCmd(argv[i], "-dlt", "-delay-line-threshold") && (i + 1 < argc)) {
+            gGlobal->gMaskDelayLineThreshold = std::atoi(argv[i + 1]);
             i += 2;
 
         } else if (isCmd(argv[i], "-mem", "--memory-manager")) {
@@ -495,7 +495,8 @@ static bool processCmdline(int argc, const char* argv[])
             i += 1;
 
         } else if (isCmd(argv[i], "-cn", "--class-name") && (i + 1 < argc)) {
-            gGlobal->gClassName = argv[i + 1];
+            vector<char> rep = {'@', ' ', '(', ')', '/', '\\', '.'};
+            gGlobal->gClassName = replaceCharList(argv[i + 1], rep, '_');
             i += 2;
 
         } else if (isCmd(argv[i], "-scn", "--super-class-name") && (i + 1 < argc)) {
@@ -530,11 +531,19 @@ static bool processCmdline(int argc, const char* argv[])
                 throw faustexception(error.str());
             }
             i += 2;
+            
+        } else if (isCmd(argv[i], "-rui", "--range-ui")) {
+            gGlobal->gRangeUI = true;
+            i += 1;
 
         } else if (isCmd(argv[i], "-fm", "--fast-math")) {
             gGlobal->gFastMath    = true;
             gGlobal->gFastMathLib = argv[i + 1];
             i += 2;
+            
+        } else if (isCmd(argv[i], "-mapp", "--math-approximation")) {
+            gGlobal->gMathApprox = true;
+            i += 1;
             
         } else if (isCmd(argv[i], "-ns", "--namespace")) {
             gGlobal->gNameSpace = argv[i + 1];
@@ -641,6 +650,7 @@ static bool processCmdline(int argc, const char* argv[])
     if (gGlobal->gInPlace && gGlobal->gVectorSwitch) {
         throw faustexception("ERROR : 'in-place' option can only be used in scalar mode\n");
     }
+    
 #if 0
     if (gGlobal->gOutputLang == "ocpp" && gGlobal->gVectorSwitch) {
         throw faustexception("ERROR : 'ocpp' backend can only be used in scalar mode\n");
@@ -691,6 +701,10 @@ static bool processCmdline(int argc, const char* argv[])
     
     if (gGlobal->gNameSpace != "" && gGlobal->gOutputLang != "cpp") {
         throw faustexception("ERROR : -ns can only be used with cpp backend\n");
+    }
+    
+    if (gGlobal->gMaskDelayLineThreshold < INT_MAX && (gGlobal->gVectorSwitch || (gGlobal->gOutputLang == "ocpp"))) {
+        throw faustexception("ERROR : '-dlt < INT_MAX' option can only be used in scalar mode and not with -ocpp backend\n");
     }
     
     if (gGlobal->gArchFile != ""
@@ -821,7 +835,7 @@ static void printHelp()
             "auto-vectorization."
          << endl;
     cout << tab << "-flist      --file-list                 use file list used to eval process." << endl;
-    cout << tab << "-exp10      --generate-exp10            function call instead of pow(10) function." << endl;
+    cout << tab << "-exp10      --generate-exp10            pow(10,x) replaced by possibly faster exp10(x)." << endl;
     cout << tab << "-os         --one-sample                generate one sample computation." << endl;
     cout << tab
          << "-cn <name>  --class-name <name>         specify the name of the dsp class to be used instead of mydsp."
@@ -834,17 +848,23 @@ static void printHelp()
     cout << tab << "-lb         --left-balanced             generate left balanced expressions." << endl;
     cout << tab << "-mb         --mid-balanced              generate mid balanced expressions (default)." << endl;
     cout << tab << "-rb         --right-balanced            generate right balanced expressions." << endl;
-    cout << tab << "-lt         --less-temporaries          generate less temporaries in compiling delays." << endl;
     cout << tab
          << "-mcd <n>    --max-copy-delay <n>        threshold between copy and ring buffer implementation (default 16 "
             "samples)."
          << endl;
+    cout << tab
+        << "-dlt <n>    --delay-line-threshold <n>  threshold between 'mask' and 'select' ring buffer implementation (default INT_MAX "
+           "samples)."
+        << endl;
     cout << tab
          << "-mem        --memory                    allocate static in global state using a custom memory manager."
          << endl;
     cout << tab
          << "-ftz <n>    --flush-to-zero <n>         code added to recursive signals [0:no (default), 1:fabs based, "
             "2:mask based (fastest)]."
+         << endl;
+    cout << tab
+         << "-rui        --range-ui                  whether to generate code to limit vslider/hslider/nentry values in [min..max] range."
          << endl;
     cout << tab
          << "-inj <f>    --inject <f>                inject source file <f> into architecture file instead of compile "
@@ -878,12 +898,13 @@ static void printHelp()
          << endl;
     cout << tab
          << "-fm <file> --fast-math <file>           use optimized versions of mathematical functions implemented in "
-            "<file>,"
+            "<file>."
          << endl;
     cout << tab << "                                        use 'faust/dsp/fastmath.cpp' when file is 'def'." << endl;
     cout << tab
-         << "-ns <name> --namespace <name>           generate C++ code in a namespace <name> "
-         << endl;
+         << "-ns <name> --namespace <name>           generate C++ code in a namespace <name>." << endl;
+    cout << tab
+         << "-mapp      --math-approximation         simpler/faster versions of 'floor/ceil/fmod/remainder' functions." << endl;
     cout << endl << "Block diagram options:" << line;
     cout << tab << "-ps        --postscript                 print block-diagram to a postscript file." << endl;
     cout << tab << "-svg       --svg                        print block-diagram to a svg file." << endl;
@@ -1022,8 +1043,6 @@ static string fxName(const string& filename)
 
     return filename.substr(p1, p2 - p1);
 }
-
-
 
 static void initFaustDirectories(int argc, const char* argv[])
 {
@@ -1297,13 +1316,15 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
         } else {
             throw faustexception("ERROR : quad format not supported in Interp\n");
         }
-
         gGlobal->gAllowForeignFunction = false;  // No foreign functions
-        gGlobal->gComputeIOTA          = true;   // Ensure IOTA base fixed delays are computed once
+        gGlobal->gAllowForeignConstant = false;  // No foreign constant
+        gGlobal->gAllowForeignVar      = false;  // No foreign variable
+        //gGlobal->gComputeIOTA          = true;   // Ensure IOTA base fixed delays are computed once
+        
         // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
         gGlobal->gFAUSTFLOAT2Internal = true;
-        gGlobal->gNeedManualPow        = false;  // Standard pow function will be used in pow(x,y) when Y in an integer
-        gGlobal->gRemoveVarAddress     = true;   // To be used in -vec mode
+        gGlobal->gNeedManualPow       = false;  // Standard pow function will be used in pow(x,y) when Y in an integer
+        gGlobal->gRemoveVarAddress    = true;   // To be used in -vec mode
 
         if (gGlobal->gVectorSwitch) {
             new_comp = new DAGInstructionsCompiler(container);
@@ -1384,6 +1405,9 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
         } else if (startWith(gGlobal->gOutputLang, "soul")) {
 #ifdef SOUL_BUILD
             gGlobal->gAllowForeignFunction = false;  // No foreign functions
+            gGlobal->gAllowForeignConstant = false;  // No foreign constant
+            gGlobal->gAllowForeignVar      = false;  // No foreign variable
+            
             // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
             gGlobal->gFAUSTFLOAT2Internal = true;
 
@@ -1398,6 +1422,9 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
         } else if (startWith(gGlobal->gOutputLang, "wast")) {
 #ifdef WASM_BUILD
             gGlobal->gAllowForeignFunction = false;  // No foreign functions
+            gGlobal->gAllowForeignConstant = false;  // No foreign constant
+            gGlobal->gAllowForeignVar      = false;  // No foreign variable
+            
             // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
             gGlobal->gFAUSTFLOAT2Internal = true;
             // the 'i' variable used in the scalar loop moves by bytes instead of frames
@@ -1438,6 +1465,9 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
         } else if (startWith(gGlobal->gOutputLang, "wasm")) {
 #ifdef WASM_BUILD
             gGlobal->gAllowForeignFunction = false;  // No foreign functions
+            gGlobal->gAllowForeignConstant = false;  // No foreign constant
+            gGlobal->gAllowForeignVar      = false;  // No foreign variable
+            
             // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
             gGlobal->gFAUSTFLOAT2Internal = true;
             // the 'i' variable used in the scalar loop moves by bytes instead of frames

@@ -226,7 +226,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
 
     list<string> fMathLibTable;                 // All standard math functions
 
-#if defined(LLVM_70) || defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110)
+#if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110)
     map<string, Intrinsic::ID> fUnaryIntrinsicTable;    // LLVM unary intrinsic
     map<string, Intrinsic::ID> fBinaryIntrinsicTable;   // LLVM binary intrinsic
 #endif
@@ -300,7 +300,13 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         fTypeMap[Typed::kObj_ptr] = dsp_ptr;
         fAllocaBuilder            = new IRBuilder<>(fModule->getContext());
  
-    #if defined(LLVM_70) || defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110)
+    #if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110)
+        
+        /* This does not work in visit(FunCallInst* inst) for intrinsic, which are deactivated for now
+        call_inst->addAttribute(AttributeList::FunctionIndex, Attribute::Builtin);
+        */
+        
+        /*
         // Float version
         fUnaryIntrinsicTable["ceilf"] = Intrinsic::ceil;
         fUnaryIntrinsicTable["cosf"] = Intrinsic::cos;
@@ -313,7 +319,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         fUnaryIntrinsicTable["sqrtf"] = Intrinsic::sqrt;
         fBinaryIntrinsicTable["powf"] = Intrinsic::pow;
         fUnaryIntrinsicTable["sinf"] = Intrinsic::sin;
-        
+       
         // Double version
         fUnaryIntrinsicTable["ceil"] = Intrinsic::ceil;
         fUnaryIntrinsicTable["cos"] = Intrinsic::cos;
@@ -326,6 +332,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         fUnaryIntrinsicTable["sqrt"] = Intrinsic::sqrt;
         fBinaryIntrinsicTable["pow"] = Intrinsic::pow;
         fUnaryIntrinsicTable["sin"] = Intrinsic::sin;
+        */
     #endif
         
         // Integer version
@@ -453,7 +460,7 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
     virtual void visit(DeclareFunInst* inst)
     {
         Function* function = fModule->getFunction(inst->fName);
-
+  
         // Define it
         if (!function) {
             
@@ -820,21 +827,31 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
             fCurValue = generateFunPolymorphicMinMax(fun_args[0], fun_args[1], kLT);
         } else if (checkMax(inst->fName) && fun_args.size() == 2) {
             fCurValue = generateFunPolymorphicMinMax(fun_args[0], fun_args[1], kGT);
-    #if defined(LLVM_70) || defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110)
+    #if defined(LLVM_80) || defined(LLVM_90) || defined(LLVM_100) || defined(LLVM_110)
         // LLVM unary intrinsic
         } else if (fUnaryIntrinsicTable.find(inst->fName) != fUnaryIntrinsicTable.end()) {
-            fCurValue = fBuilder->CreateUnaryIntrinsic(fUnaryIntrinsicTable[inst->fName], fun_args[0]);
+            
+            CallInst* call_inst = fBuilder->CreateUnaryIntrinsic(fUnaryIntrinsicTable[inst->fName], fun_args[0]);
+            call_inst->addAttribute(AttributeList::FunctionIndex, Attribute::Builtin);
+            fCurValue = call_inst;
+            
         // LLVM binary intrinsic
         } else if (fBinaryIntrinsicTable.find(inst->fName) != fBinaryIntrinsicTable.end()) {
-            fCurValue = fBuilder->CreateBinaryIntrinsic(fBinaryIntrinsicTable[inst->fName], fun_args[0], fun_args[1]);
+            
+            CallInst* call_inst = fBuilder->CreateBinaryIntrinsic(fBinaryIntrinsicTable[inst->fName], fun_args[0], fun_args[1]);
+            call_inst->addAttribute(AttributeList::FunctionIndex, Attribute::Builtin);
+            fCurValue = call_inst;
+            
     #endif
         } else {
             // Get function in the module
             Function* function = fModule->getFunction(gGlobal->getMathFunction(inst->fName));
             faustassert(function);
-
+        
             // Result is function call
-            fCurValue = CreateFuncall(function, fun_args);
+            CallInst* call_inst = CreateFuncall(function, fun_args);
+            call_inst->addAttribute(AttributeList::FunctionIndex, Attribute::Builtin);
+            fCurValue = call_inst;
         }
     }
     
@@ -860,9 +877,9 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
     {
         // Compile condition, result in fCurValue
         inst->fCond->accept(this);
-  
-        // Convert condition to a bool
-        LLVMValue cond_value = fBuilder->CreateTrunc(fCurValue, fBuilder->getInt1Ty(), "select_cond");
+     
+        // Compare condition to 0
+        LLVMValue cond_value = fBuilder->CreateICmp(ICmpInst::ICMP_NE, fCurValue, genInt32(0));
 
         // Compile then branch, result in fCurValue
         inst->fThen->accept(this);
@@ -893,9 +910,9 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         // Compile condition, result in fCurValue
         inst->fCond->accept(this);
         
-        // Convert condition to a bool
-        LLVMValue cond_value = fBuilder->CreateTrunc(fCurValue, fBuilder->getInt1Ty(), "select_cond");
-        
+        // Compare condition to 0
+        LLVMValue cond_value = fBuilder->CreateICmp(ICmpInst::ICMP_NE, fCurValue, genInt32(0));
+      
         // Get enclosing function
         Function* function = fBuilder->GetInsertBlock()->getParent();
         
@@ -913,6 +930,9 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         inst->fThen->accept(this);
         
         // Create typed local variable
+        
+        // Always at the begining since the block is already branched to next one...
+        fAllocaBuilder->SetInsertPoint(GetIterator(fAllocaBuilder->GetInsertBlock()->getFirstInsertionPt()));
         LLVMValue typed_res = fAllocaBuilder->CreateAlloca(getCurType(), nullptr, "select_res");
       
         // "Then" is a BlockInst, result is in fCurValue
@@ -946,10 +966,10 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
     {
         // Compile condition, result in fCurValue
         inst->fCond->accept(this);
-
-        // Convert condition to a bool
-        LLVMValue cond_value = fBuilder->CreateTrunc(fCurValue, fBuilder->getInt1Ty(), "if_cond");
-
+  
+        // Compare condition to 0
+        LLVMValue cond_value = fBuilder->CreateICmp(ICmpInst::ICMP_NE, fCurValue, genInt32(0));
+ 
         // Get enclosing function
         Function* function = fBuilder->GetInsertBlock()->getParent();
 
@@ -1038,10 +1058,10 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
         {
             // Compute end condition, result in fCurValue
             inst->fEnd->accept(this);
-
-            // Convert condition to a bool
-            LLVMValue end_cond = fBuilder->CreateTrunc(fCurValue, fBuilder->getInt1Ty());
-
+   
+            // Compare condition to 0
+            LLVMValue end_cond = fBuilder->CreateICmp(ICmpInst::ICMP_NE, fCurValue, genInt32(0));
+      
             // Insert the conditional branch into the last block of loop
             fBuilder->CreateCondBr(end_cond, loop_body_block, exit_block);
         }
@@ -1105,10 +1125,10 @@ class LLVMInstVisitor : public InstVisitor, public LLVMTypeHelper {
 
         // Create the exit_block and insert it
         BasicBlock* exit_block = genBlock("exit_block", function);
-
-        // Convert condition to a bool
-        LLVMValue end_cond = fBuilder->CreateTrunc(fCurValue, fBuilder->getInt1Ty());
-
+ 
+        // Compare condition to 0
+        LLVMValue end_cond = fBuilder->CreateICmp(ICmpInst::ICMP_NE, fCurValue, genInt32(0));
+    
         // Insert the conditional branch into the end of cond_block
         fBuilder->CreateCondBr(end_cond, test_block, exit_block);
 

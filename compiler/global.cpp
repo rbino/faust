@@ -114,7 +114,6 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gMaxNameSize      = 40;
     gSimpleNames      = false;
     gSimplifyDiagrams = false;
-    gLessTempSwitch   = false;
     gMaxCopyDelay     = 16;
 
     gVectorSwitch      = false;
@@ -133,6 +132,7 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gUIMacroSwitch = false;
     gDumpNorm      = false;
     gFTZMode       = 0;
+    gRangeUI       = false;
 
     gFloatSize = 1;
 
@@ -154,6 +154,8 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
 
     // Backend configuration : default values
     gAllowForeignFunction = true;
+    gAllowForeignConstant = true;
+    gAllowForeignVar      = true;
     gComputeIOTA          = false;
     gFAUSTFLOAT2Internal  = false;
     gInPlace              = false;
@@ -163,6 +165,7 @@ global::global() : TABBER(1), gLoopDetector(1024, 400), gStackOverflowDetector(M
     gUseDefaultSound      = true;
     gHasTeeLocal          = false;
     gFastMath             = false;
+    gMathApprox           = false;
     gNeedManualPow        = true;
     gRemoveVarAddress     = false;
     gOneSample            = false;
@@ -457,6 +460,7 @@ void global::init()
     // Essential predefined types
     gMemoizedTypes   = new property<AudioType*>();
     gAllocationCount = 0;
+    gMaskDelayLineThreshold  = INT_MAX;
 
     // True by default but only usable with -lang ocpp backend
     gEnableFlag = true;
@@ -739,14 +743,6 @@ string global::getFreshID(const string& prefix)
     int n               = gIDCounters[prefix];
     gIDCounters[prefix] = n + 1;
     return subst("$0$1", prefix, T(n));
-}
-
-Garbageable::Garbageable()
-{
-}
-
-Garbageable::~Garbageable()
-{
 }
 
 void Garbageable::cleanup()

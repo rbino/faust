@@ -133,7 +133,7 @@ using namespace std;
 #define ASSIST_INLET 	1
 #define ASSIST_OUTLET 	2
 
-#define EXTERNAL_VERSION    "0.75"
+#define EXTERNAL_VERSION    "0.79"
 #define STR_SIZE            512
 
 #include "faust/gui/GUI.h"
@@ -194,7 +194,9 @@ void faust_allocate(t_faust* x, int nvoices)
     x->m_dspUI->clear();
     
     if (nvoices > 0) {
+    #ifdef POST
         post("polyphonic DSP voices = %d", nvoices);
+    #endif
         x->m_dsp_poly = new mydsp_poly(new mydsp(), nvoices, true, true);
     #ifdef POLY2
         x->m_dsp = new dsp_sequencer(x->m_dsp_poly, new effect());
@@ -205,8 +207,40 @@ void faust_allocate(t_faust* x, int nvoices)
         x->m_midiHandler->addMidiIn(x->m_dsp_poly);
     #endif
     } else {
+    #ifdef POST
         post("monophonic DSP");
+    #endif
+    #if (DOWN_SAMPLING > 0)
+        #if (FILTER_TYPE == 0)
+            x->m_dsp = new dsp_down_sampler<Identity<Double<1,1>, DOWN_SAMPLING>>(new mydsp());
+        #elif (FILTER_TYPE == 1)
+            x->m_dsp = new dsp_down_sampler<LowPass3<Double<45,100>, DOWN_SAMPLING, double>>(new mydsp());
+        #elif (FILTER_TYPE == 2)
+            x->m_dsp = new dsp_down_sampler<LowPass4<Double<45,100>, DOWN_SAMPLING, double>>(new mydsp());
+        #elif (FILTER_TYPE == 3)
+            x->m_dsp = new dsp_down_sampler<LowPass3e<Double<45,100>, DOWN_SAMPLING, double>>(new mydsp());
+        #elif (FILTER_TYPE == 4)
+            x->m_dsp = new dsp_down_sampler<LowPass6eé<Double<45,100>, DOWN_SAMPLING, double>>(new mydsp());
+        #else
+            #error "ERROR : Filter type must be in [0..4] range"
+        #endif
+    #elif (UP_SAMPLING > 0)
+        #if (FILTER_TYPE == 0)
+            x->m_dsp = new dsp_up_sampler<Identity<Double<1,1>, UP_SAMPLING>>(new mydsp());
+        #elif (FILTER_TYPE == 1)
+            x->m_dsp = new dsp_up_sampler<LowPass3<Double<45,100>, UP_SAMPLING, double>>(new mydsp());
+        #elif (FILTER_TYPE == 2)
+            x->m_dsp = new dsp_up_sampler<LowPass4<Double<45,100>, UP_SAMPLING, double>>(new mydsp());
+        #elif (FILTER_TYPE == 3)
+            x->m_dsp = new dsp_up_sampler<LowPass3e<Double<45,100>, UP_SAMPLING, double>>(new mydsp());
+        #elif (FILTER_TYPE == 4)
+            x->m_dsp = new dsp_up_sampler<LowPass6e<Double<45,100>, UP_SAMPLING, double>>(new mydsp());
+        #else
+            #error "ERROR : Filter type must be in [0..4] range"
+        #endif
+    #else
         x->m_dsp = new mydsp();
+    #endif
     }
     
 #ifdef MIDICTRL
@@ -496,8 +530,9 @@ void* faust_new(t_symbol* s, short ac, t_atom* av)
     x->m_dsp->buildUserInterface(x->m_savedUI);
     
     // Display controls
+#ifdef POST
     x->m_dspUI->displayControls();
-    
+#endif   
     // Get attributes values
     attr_args_process(x, ac, av);
     
@@ -545,8 +580,9 @@ void faust_osc(t_faust* x, t_symbol* s, short ac, t_atom* av)
             x->m_oscInterface = new OSCUI("Faust", argc1, (char**)argv1);
             x->m_dsp->buildUserInterface(x->m_oscInterface);
             x->m_oscInterface->run();
-            
+
             post(x->m_oscInterface->getInfos().c_str());
+
             systhread_mutex_unlock(x->m_mutex);
         } else {
             post("Mutex lock cannot be taken...");
@@ -585,8 +621,7 @@ void faust_init(t_faust* x, t_symbol* s, short ac, t_atom* av)
  }
 
 /*--------------------------------------------------------------------------*/
-// Dump controllers as list of: [path, cur, init, min, max]
-void faust_dump(t_faust* x, t_symbol* s, short ac, t_atom* av)
+void faust_dump_inputs(t_faust* x)
 {
     // Input controllers
     for (mspUI::iterator it = x->m_dspUI->begin2(); it != x->m_dspUI->end2(); it++) {
@@ -597,6 +632,11 @@ void faust_dump(t_faust* x, t_symbol* s, short ac, t_atom* av)
         atom_setfloat(&myList[3], (*it).second->getMaxValue());
         outlet_list(x->m_control_outlet, 0, 4, myList);
     }
+}
+
+/*--------------------------------------------------------------------------*/
+void faust_dump_outputs(t_faust* x)
+{
     // Output controllers
     for (mspUI::iterator it = x->m_dspUI->begin4(); it != x->m_dspUI->end4(); it++) {
         t_atom myList[4];
@@ -606,6 +646,14 @@ void faust_dump(t_faust* x, t_symbol* s, short ac, t_atom* av)
         atom_setfloat(&myList[3], (*it).second->getMaxValue());
         outlet_list(x->m_control_outlet, 0, 4, myList);
     }
+}
+
+/*--------------------------------------------------------------------------*/
+// Dump controllers as list of [path, cur, min, max]
+void faust_dump(t_faust* x, t_symbol* s, short ac, t_atom* av)
+{
+    faust_dump_inputs(x);
+    faust_dump_outputs(x);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -683,7 +731,9 @@ void faust_perform64(t_faust* x, t_object* dsp64, double** ins, long numins, dou
         #ifdef OSCCTRL
             if (x->m_oscInterface) x->m_oscInterface->endBundle();
         #endif
-            faust_update_outputs(x);
+            //faust_update_outputs(x);
+            // Use the right outlet to output messages
+            faust_dump_outputs(x);
         }
     #if defined(MIDICTRL) || defined(OSCCTRL)
         GUI::updateAllGuis();
@@ -721,7 +771,9 @@ extern "C" int main(void)
 void ext_main(void* r)
 #endif
 {
-    string class_name = string(FAUST_CLASS_NAME) + "~";
+    string file_name = string(FAUST_FILE_NAME);
+    // Remove ".dsp" ending
+    string class_name = file_name.erase(file_name.size()-4) + "~";
     t_class* c = class_new(class_name.c_str(), (method)faust_new, (method)faust_free, sizeof(t_faust), 0L, A_GIMME, 0);
     
     class_addmethod(c, (method)faust_anything, "anything", A_GIMME, 0);
@@ -744,14 +796,13 @@ void ext_main(void* r)
     tmp_dsp->buildUserInterface(&tmp_UI);
     
     // Setup attributes
-    int i = 0;
     if (sizeof(FAUSTFLOAT) == 4) {
-        for (mspUI::iterator it = tmp_UI.begin1(); it != tmp_UI.end1(); it++, i++) {
+        for (mspUI::iterator it = tmp_UI.begin1(); it != tmp_UI.end1(); it++) {
             CLASS_ATTR_FLOAT(c, (*it).first.c_str(), 0, t_faust, m_ob);
             CLASS_ATTR_ACCESSORS(c, (*it).first.c_str(), NULL, (method)faust_attr_set);
         }
     } else {
-        for (mspUI::iterator it = tmp_UI.begin1(); it != tmp_UI.end1(); it++, i++) {
+        for (mspUI::iterator it = tmp_UI.begin1(); it != tmp_UI.end1(); it++) {
             CLASS_ATTR_DOUBLE(c, (*it).first.c_str(), 0, t_faust, m_ob);
             CLASS_ATTR_ACCESSORS(c, (*it).first.c_str(), NULL, (method)faust_attr_set);
         }
@@ -760,17 +811,19 @@ void ext_main(void* r)
     class_dspinit(c);
     class_register(CLASS_BOX, c);
     faust_class = c;
-
+#ifdef POST
     post((char*)"Faust DSP object v%s (sample = %s bits code = %s)", EXTERNAL_VERSION, ((sizeof(FAUSTFLOAT) == 4) ? "32" : "64"), getCodeSize());
     post((char*)"Copyright (c) 2012-2020 Grame");
-    
+#endif
     Max_Meta1 meta1;
     tmp_dsp->metadata(&meta1);
     if (meta1.fCount > 0) {
+    #ifdef POST
         Max_Meta2 meta2;
         post("------------------------------");
         tmp_dsp->metadata(&meta2);
         post("------------------------------");
+    #endif
     }
     delete(tmp_dsp);
 #ifdef _WIN32

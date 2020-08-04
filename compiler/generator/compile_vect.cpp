@@ -323,11 +323,13 @@ bool VectorCompiler::needSeparateLoop(Tree sig)
         // and not shared, doesn't require a separate loop.
         b = false;
     }
-    /*    if (b) {
-            cerr << "Separate Loop for " << ppsig(sig) << endl;
-        } else {
-            cerr << "Same Loop for " << ppsig(sig) << endl;
-        }*/
+    /*
+    if (b) {
+        cerr << "Separate Loop for " << ppsig(sig) << endl;
+    } else {
+        cerr << "Same Loop for " << ppsig(sig) << endl;
+    }
+    */
     return b;
 }
 
@@ -347,7 +349,7 @@ string VectorCompiler::generateVariableStore(Tree sig, const string& exp)
 
 /**
  * Generate code for accessing a delayed signal. The generated code depend of
- * the maximum delay attached to exp and the gLessTempSwitch.
+ * the maximum delay attached to exp.
  */
 
 string VectorCompiler::generateFixDelay(Tree sig, Tree exp, Tree delay)
@@ -426,15 +428,6 @@ void VectorCompiler::generateDelayLine(const string& ctype, const string& vname,
         generateDlineLoop(ctype, vname, mxd, exp, ccs);
     }
 }
-
-#if 0
-static int pow2limit(int x)
-{
-    int n = 2;
-    while (n < x) { n = 2*n; }
-    return n;
-}
-#endif
 
 /**
  * Generate the code for a (short) delay line

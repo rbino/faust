@@ -74,6 +74,7 @@ typedef map<Tree, set<Tree>, comp_str> MetaDataSet;
 
 typedef map<Tree, set<Tree>> FunMDSet;  // foo -> {(file/foo/key,value)...}
 
+// Global singleton like compiler state
 struct global {
     Tree gResult;
     Tree gResult2;
@@ -114,7 +115,6 @@ struct global {
     int    gMaxNameSize;
     bool   gSimpleNames;
     bool   gSimplifyDiagrams;
-    bool   gLessTempSwitch;
     int    gMaxCopyDelay;
     string gOutputFile;
 
@@ -134,16 +134,17 @@ struct global {
     bool gUIMacroSwitch;
     bool gDumpNorm;
     int  gFTZMode;
-
+    bool gRangeUI;      // whether to generate code to limit vslider/hslider/nentry values in [min..max] range
+    
     int gFloatSize;
 
     bool gPrintFileListSwitch;
     bool gInlineArchSwitch;
 
     bool gDSPStruct;
-    bool gLightMode;  // do not generate the entire DSP API (to be used with Emscripten to generate a light DSP module
-                      // for JavaScript)
-    bool gClang;      // when compiled with clang/clang++, adds specific #pragma for auto-vectorization
+    bool gLightMode;    // do not generate the entire DSP API (to be used with Emscripten to generate a light DSP module
+                        // for JavaScript)
+    bool gClang;        // when compiled with clang/clang++, adds specific #pragma for auto-vectorization
     string gCheckTable; // whether to check RDTable and RWTable index range
 
     string gClassName;       // name of the generated dsp class, by default 'mydsp'
@@ -153,6 +154,8 @@ struct global {
     // Backend configuration
     string gOutputLang;            // Chosen backend
     bool   gAllowForeignFunction;  // Can use foreign functions
+    bool   gAllowForeignConstant;  // Can use foreign constant
+    bool   gAllowForeignVar;       // Can use foreign variable
     bool   gComputeIOTA;           // Cache some computation done with IOTA variable
     bool   gFAUSTFLOAT2Internal;   // FAUSTFLOAT type (= kFloatMacro) forced to internal real
     bool   gInPlace;               // Add cache to input for correct in-place computations
@@ -162,6 +165,7 @@ struct global {
     bool   gUseDefaultSound;       // If default global variable is used in 'soundfile' primitive generation
     bool   gHasTeeLocal;           // For wast/wasm backends
     bool   gFastMath;              // Faster version of some mathematical functions (pow/exp/log)
+    bool   gMathApprox;            // Simpler/faster versions of 'floor/fmod/remainder' functions
     bool   gNeedManualPow;         // If manual pow(x, y) generation when y is an integer is needed
     bool   gRemoveVarAddress;      // If used of variable addresses (like &foo or &foo[n]) have to be removed
     bool   gOneSample;             // Generate one sample computation
@@ -176,9 +180,9 @@ struct global {
 
     const char* gInputString;
 
-    bool gLstDependenciesSwitch;  ///< mdoc listing management.
-    bool gLstMdocTagsSwitch;      ///< mdoc listing management.
-    bool gLstDistributedSwitch;   ///< mdoc listing management.
+    bool gLstDependenciesSwitch;  ///< mdoc listing management
+    bool gLstMdocTagsSwitch;      ///< mdoc listing management
+    bool gLstDistributedSwitch;   ///< mdoc listing management
 
     map<string, string> gDocMetadatasStringMap;
     set<string>         gDocMetadatasKeySet;
@@ -190,14 +194,14 @@ struct global {
 
     map<string, string> gDocMathStringMap;
 
-    vector<Tree> gDocVector;  ///< Contains <mdoc> parsed trees: DOCTXT, DOCEQN, DOCDGM.
+    vector<Tree> gDocVector;  ///< Contains <mdoc> parsed trees: DOCTXT, DOCEQN, DOCDGM
 
     map<string, string> gDocNoticeStringMap;
     set<string>         gDocNoticeKeySet;
 
     set<string> gDocMathKeySet;
 
-    bool gLatexDocSwitch;  // Only LaTeX outformat is handled for the moment.
+    bool gLatexDocSwitch;  // Only LaTeX outformat is handled for the moment
 
     int gErrorCount;
 
@@ -445,8 +449,8 @@ struct global {
 
     int gMachineMaxStackSize;
 
-    const char* gDocDevSuffix;  ///< ".tex" (or .??? - used to choose output device).
-    string      gCurrentDir;    ///< Room to save current directory name.
+    const char* gDocDevSuffix;  ///< ".tex" (or .??? - used to choose output device)
+    string      gCurrentDir;    ///< Room to save current directory name
     string      gLatexheaderfilename;
 
     struct tm gCompilationDate;
@@ -479,6 +483,8 @@ struct global {
     char* gCurrentLocal;
 
     int gAllocationCount;  // Internal signal types counter
+    
+    int gMaskDelayLineThreshold;   // Power-of-two and mask delay-lines treshold
 
     bool gEnableFlag;
 

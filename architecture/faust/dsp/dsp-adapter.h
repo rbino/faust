@@ -187,7 +187,18 @@ struct Filter {
     inline int getFactor() { return fVslider1; }
 };
 
-// Generated with process = fi.lowpass(3, ma.SR*vslider("FCFactor", 0.4, 0.4, 0.5, 0.01)/vslider("Factor", 2, 2, 8, 1));
+// Identity filter: copy input to output
+template <class fVslider0, int fVslider1>
+struct Identity : public Filter<fVslider0, fVslider1> {
+    inline int getFactor() { return fVslider1; }
+    
+    inline void compute(int count, FAUSTFLOAT* input0, FAUSTFLOAT* output0)
+    {
+        memcpy(output0, input0, count * sizeof(FAUSTFLOAT));
+    }
+};
+
+// Generated with process = fi.lowpass(3, ma.SR*hslider("FCFactor", 0.4, 0.4, 0.5, 0.01)/hslider("Factor", 2, 2, 8, 1));
 template <class fVslider0, int fVslider1, typename REAL>
 struct LowPass3 : public Filter<fVslider0, fVslider1> {
 
@@ -195,7 +206,7 @@ struct LowPass3 : public Filter<fVslider0, fVslider1> {
     REAL fRec1[2];
     REAL fRec0[3];
 
-    inline REAL mydsp_faustpower2_f(REAL value)
+    inline REAL LowPass3_faustpower2_f(REAL value)
     {
         return (value * value);
     }
@@ -222,7 +233,7 @@ struct LowPass3 : public Filter<fVslider0, fVslider1> {
         REAL fSlow3 = (1.0 / (fSlow1 + 1.0));
         REAL fSlow4 = (1.0 - fSlow1);
         REAL fSlow5 = (((fSlow1 + -1.0000000000000002) / fSlow0) + 1.0);
-        REAL fSlow6 = (2.0 * (1.0 - (1.0 / mydsp_faustpower2_f(fSlow0))));
+        REAL fSlow6 = (2.0 * (1.0 - (1.0 / LowPass3_faustpower2_f(fSlow0))));
         // Computed at runtime
         for (int i = 0; (i < count); i = (i + 1)) {
             REAL fTemp0 = REAL(input0[i]);
@@ -238,14 +249,14 @@ struct LowPass3 : public Filter<fVslider0, fVslider1> {
     }
 };
 
-// Generated with process = fi.lowpass(4, ma.SR*vslider("FCFactor", 0.4, 0.4, 0.5, 0.01)/vslider("Factor", 2, 2, 8, 1));
+// Generated with process = fi.lowpass(4, ma.SR*hslider("FCFactor", 0.4, 0.4, 0.5, 0.01)/hslider("Factor", 2, 2, 8, 1));
 template <class fVslider0, int fVslider1, typename REAL>
 struct LowPass4 : public Filter<fVslider0, fVslider1> {
     
     REAL fRec1[3];
     REAL fRec0[3];
     
-    inline REAL mydsp_faustpower2_f(REAL value)
+    inline REAL LowPass4_faustpower2_f(REAL value)
     {
         return (value * value);
     }
@@ -268,7 +279,7 @@ struct LowPass4 : public Filter<fVslider0, fVslider1> {
         REAL fSlow2 = (1.0 / (((fSlow1 + 0.76536686473017945) / fSlow0) + 1.0));
         REAL fSlow3 = (1.0 / (((fSlow1 + 1.8477590650225735) / fSlow0) + 1.0));
         REAL fSlow4 = (((fSlow1 + -1.8477590650225735) / fSlow0) + 1.0);
-        REAL fSlow5 = (2.0 * (1.0 - (1.0 / mydsp_faustpower2_f(fSlow0))));
+        REAL fSlow5 = (2.0 * (1.0 - (1.0 / LowPass4_faustpower2_f(fSlow0))));
         REAL fSlow6 = (((fSlow1 + -0.76536686473017945) / fSlow0) + 1.0);
         // Computed at runtime
         for (int i = 0; (i < count); i = (i + 1)) {
@@ -283,7 +294,7 @@ struct LowPass4 : public Filter<fVslider0, fVslider1> {
     }
 };
 
-// Generated with process = fi.lowpass3e(ma.SR*vslider("FCFactor", 0.4, 0.4, 0.5, 0.01)/vslider("Factor", 2, 2, 8, 1));
+// Generated with process = fi.lowpass3e(ma.SR*hslider("FCFactor", 0.4, 0.4, 0.5, 0.01)/hslider("Factor", 2, 2, 8, 1));
 template <class fVslider0, int fVslider1, typename REAL>
 struct LowPass3e : public Filter<fVslider0, fVslider1> {
 
@@ -291,7 +302,7 @@ struct LowPass3e : public Filter<fVslider0, fVslider1> {
     REAL fVec0[2];
     REAL fRec0[2];
     
-    inline REAL mydsp_faustpower2_f(REAL value)
+    inline REAL LowPass3e_faustpower2_f(REAL value)
     {
         return (value * value);
     }
@@ -317,7 +328,7 @@ struct LowPass3e : public Filter<fVslider0, fVslider1> {
         REAL fSlow2 = (1.0 / (fSlow1 + 0.82244590899881598));
         REAL fSlow3 = (0.82244590899881598 - fSlow1);
         REAL fSlow4 = (1.0 / (((fSlow1 + 0.80263676416103003) / fSlow0) + 1.4122708937742039));
-        REAL fSlow5 = mydsp_faustpower2_f(fSlow0);
+        REAL fSlow5 = LowPass3e_faustpower2_f(fSlow0);
         REAL fSlow6 = (0.019809144837788999 / fSlow5);
         REAL fSlow7 = (fSlow6 + 1.1615164189826961);
         REAL fSlow8 = (((fSlow1 + -0.80263676416103003) / fSlow0) + 1.4122708937742039);
@@ -338,7 +349,7 @@ struct LowPass3e : public Filter<fVslider0, fVslider1> {
     }
 };
 
-// Generated with process = fi.lowpass6e(ma.SR*vslider("FCFactor", 0.4, 0.4, 0.5, 0.01)/vslider("Factor", 2, 2, 8, 1));
+// Generated with process = fi.lowpass6e(ma.SR*hslider("FCFactor", 0.4, 0.4, 0.5, 0.01)/hslider("Factor", 2, 2, 8, 1));
 template <class fVslider0, int fVslider1, typename REAL>
 struct LowPass6e : public Filter<fVslider0, fVslider1> {
 
@@ -346,7 +357,7 @@ struct LowPass6e : public Filter<fVslider0, fVslider1> {
     REAL fRec1[3];
     REAL fRec0[3];
     
-    inline REAL mydsp_faustpower2_f(REAL value)
+    inline REAL LowPass6e_faustpower2_f(REAL value)
     {
         return (value * value);
     }
@@ -370,7 +381,7 @@ struct LowPass6e : public Filter<fVslider0, fVslider1> {
         REAL fSlow0 = std::tan((3.1415926535897931 * (REAL(fVslider0::value()) / REAL(fVslider1))));
         REAL fSlow1 = (1.0 / fSlow0);
         REAL fSlow2 = (1.0 / (((fSlow1 + 0.16840487111358901) / fSlow0) + 1.0693584077073119));
-        REAL fSlow3 = mydsp_faustpower2_f(fSlow0);
+        REAL fSlow3 = LowPass6e_faustpower2_f(fSlow0);
         REAL fSlow4 = (1.0 / fSlow3);
         REAL fSlow5 = (fSlow4 + 53.536152954556727);
         REAL fSlow6 = (1.0 / (((fSlow1 + 0.51247864188914105) / fSlow0) + 0.68962136448467504));
@@ -534,8 +545,9 @@ class dsp_down_sampler : public sr_sampler<FILTER> {
                 memset(outputs[chan], 0, sizeof(FAUSTFLOAT) * count);
                 for (int frame = 0; frame < real_count; frame++) {
                     // Copy one sample every 'DownFactor'
-                    outputs[chan][frame * this->getFactor()] = fOutputs[chan][frame] * this->getFactor();
-                    //outputs[chan][frame * this->getFactor()] = fOutputs[chan][frame];
+                    // Apply volume
+                    //outputs[chan][frame * this->getFactor()] = fOutputs[chan][frame] * this->getFactor();
+                    outputs[chan][frame * this->getFactor()] = fOutputs[chan][frame];
                 }
                 // Lowpass filtering in place on 'outputs'
                 this->fOutputLowPass[chan].compute(count, outputs[chan], outputs[chan]);
@@ -605,8 +617,9 @@ class dsp_up_sampler : public sr_sampler<FILTER> {
                 this->fOutputLowPass[chan].compute(real_count, fOutputs[chan], fOutputs[chan]);
                 // Decimate
                 for (int frame = 0; frame < count; frame++) {
-                    outputs[chan][frame] = fOutputs[chan][frame * this->getFactor()] * this->getFactor();
-                    //outputs[chan][frame] = fOutputs[chan][frame * this->getFactor()];
+                    // Apply volume
+                    //outputs[chan][frame] = fOutputs[chan][frame * this->getFactor()] * this->getFactor();
+                    outputs[chan][frame] = fOutputs[chan][frame * this->getFactor()];
                 }
             }
         }

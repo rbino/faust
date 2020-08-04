@@ -125,9 +125,9 @@ int main(int argc, char* argv[])
         cout << "-timeout <num> when used in -noui mode, to stop the application after a given timeout in seconds (default = 10s)\n";
         cout << "-trace 1 to collect FP_SUBNORMAL only\n";
         cout << "-trace 2 to collect FP_SUBNORMAL, FP_INFINITE and FP_NAN\n";
-        cout << "-trace 3 to collect FP_SUBNORMAL, FP_INFINITE, FP_NAN, INTEGER_OVERFLOW and DIV_BY_ZERO\n";
-        cout << "-trace 4 to collect FP_SUBNORMAL, FP_INFINITE, FP_NAN, INTEGER_OVERFLOW, DIV_BY_ZERO and LOAD/STORE errors, fails at first FP_INFINITE, FP_NAN or LOAD/STORE errors\n";
-        cout << "-trace 5 to collect FP_SUBNORMAL, FP_INFINITE, FP_NAN, INTEGER_OVERFLOW, DIV_BY_ZERO and LOAD/STORE errors, continue after FP_INFINITE, FP_NAN or LOAD/STORE errors\n";
+        cout << "-trace 3 to collect FP_SUBNORMAL, FP_INFINITE, FP_NAN, INTEGER_OVERFLOW, DIV_BY_ZERO and CAST_INT_OVERFLOW\n";
+        cout << "-trace 4 to collect FP_SUBNORMAL, FP_INFINITE, FP_NAN, INTEGER_OVERFLOW, DIV_BY_ZERO, CAST_INT_OVERFLOW and LOAD/STORE errors, fails at first FP_INFINITE, FP_NAN or LOAD/STORE errors\n";
+        cout << "-trace 5 to collect FP_SUBNORMAL, FP_INFINITE, FP_NAN, INTEGER_OVERFLOW, DIV_BY_ZERO, CAST_INT_OVERFLOW and LOAD/STORE errors, continue after FP_INFINITE, FP_NAN or LOAD/STORE errors\n";
         cout << "-trace 6 to only check LOAD/STORE errors and continue\n";
         cout << "-trace 7 to only check LOAD/STORE errors and exit\n";
         exit(EXIT_FAILURE);
@@ -186,11 +186,28 @@ int main(int argc, char* argv[])
             exit(EXIT_FAILURE);
         }
         
-        cout << "getName " << factory->getName() << endl;
+        if (isopt(argv, "-double")) {
+            cout << "Running in double..." << endl;
+        }
         
-        dummyaudio audio(44100, 16, INT_MAX);
-        if (!audio.init(filename, DSP)) {
-            exit(EXIT_FAILURE);
+        cout << "getName " << factory->getName() << endl;
+        dummyaudio_real<float>* dummy_driver_float = nullptr;
+        dummyaudio_real<double>* dummy_driver_double = nullptr;
+        
+        if (isopt(argv, "-double")) {
+            dummy_driver_double = new dummyaudio_real<double>(44100, 16, INT_MAX);
+        } else {
+            dummy_driver_float = new dummyaudio_real<float>(44100, 16, INT_MAX);
+        }
+        
+        if (dummy_driver_float) {
+            if (!dummy_driver_float->init(filename, DSP)) {
+                exit(EXIT_FAILURE);
+            }
+        } else {
+            if (!dummy_driver_double->init(filename, DSP)) {
+                exit(EXIT_FAILURE);
+            }
         }
         
         if (!is_noui) {
@@ -216,12 +233,20 @@ int main(int argc, char* argv[])
                     // Test min
                     cout << "Min: " << min << endl;
                     *ctl.fControlZone[index].first = min;
-                    audio.render();
+                    if (dummy_driver_float) {
+                        dummy_driver_float->render();
+                    } else {
+                        dummy_driver_double->render();
+                    }
                     *ctl.fControlZone[index].first = init; // reset to init
                     // Test max
                     cout << "Max: " << max << endl;
                     *ctl.fControlZone[index].first = max;
-                    audio.render();
+                    if (dummy_driver_float) {
+                        dummy_driver_float->render();
+                    } else {
+                        dummy_driver_double->render();
+                    }
                     *ctl.fControlZone[index].first = init; // reset to init
                 }
             }
@@ -242,11 +267,19 @@ int main(int argc, char* argv[])
                     // Test max
                     cout << "Max: " << max << endl;
                     *ctl.fControlZone[index].first = max;
-                    audio.render();
+                    if (dummy_driver_float) {
+                        dummy_driver_float->render();
+                    } else {
+                        dummy_driver_double->render();
+                    }
                     // Test min
                     cout << "Min: " << min << endl;
                     *ctl.fControlZone[index].first = min;
-                    audio.render();
+                    if (dummy_driver_float) {
+                        dummy_driver_float->render();
+                    } else {
+                        dummy_driver_double->render();
+                    }
                 }
             }
             
@@ -266,11 +299,19 @@ int main(int argc, char* argv[])
                     // Test min
                     cout << "Min: " << min << endl;
                     *ctl.fControlZone[index].first = min;
-                    audio.render();
+                    if (dummy_driver_float) {
+                        dummy_driver_float->render();
+                    } else {
+                        dummy_driver_double->render();
+                    }
                     // Test max
                     cout << "Max: " << max << endl;
                     *ctl.fControlZone[index].first = max;
-                    audio.render();
+                    if (dummy_driver_float) {
+                        dummy_driver_float->render();
+                    } else {
+                        dummy_driver_double->render();
+                    }
                 }
             }
             
@@ -281,21 +322,39 @@ int main(int argc, char* argv[])
             for (int step = 0; step < 1000; step++) {
                 cout << "Set random controllers, step: " << step <<  " until: " << 1000 << endl;
                 random.update();
-                audio.render();
+                if (dummy_driver_float) {
+                    dummy_driver_float->render();
+                } else {
+                    dummy_driver_double->render();
+                }
             }
             
             goto end;
             
         } else {
-            audio.start();
+            if (dummy_driver_float) {
+                dummy_driver_float->start();
+            } else {
+                dummy_driver_double->start();
+            }
         }
         
         if (!is_noui) {
             interface->run();
         } else {
+            cout << "Use Ctrl-c to Quit" << endl;
             usleep(time_out * 1e6);
         }
-        audio.stop();
+        
+        if (dummy_driver_float) {
+            dummy_driver_float->stop();
+        } else {
+            dummy_driver_double->stop();
+        }
+        
+        delete dummy_driver_float;
+        delete dummy_driver_double;
+        
     } catch (...) {
         cout << endl;
         random.display();

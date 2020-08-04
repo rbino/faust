@@ -63,11 +63,10 @@
 int main(int argc, char* argv[])
 {
     mydsp DSP;
-    PrintUI ui;
-    
     std::cout << "DSP size: " << sizeof(DSP) << " bytes\n";
     
     // Activate the UI, here that only print the control paths
+    PrintUI ui;
     DSP.buildUserInterface(&ui);
 
     // Allocate the audio driver to render 5 buffers of 512 frames

@@ -1,6 +1,16 @@
 /************************************************************************
+ IMPORTANT NOTE : this file contains two clearly delimited sections :
+ the ARCHITECTURE section (in two parts) and the USER section. Each section
+ is governed by its own copyright and license. Please check individually
+ each section for license and copyright information.
+ *************************************************************************/
+
+/*******************BEGIN ARCHITECTURE SECTION (part 1/2)****************/
+
+/************************************************************************
  FAUST Architecture File
- Copyright (C) 2019-2020 GRAME, Centre National de Creation Musicale
+ Copyright (C) 2019-2020 GRAME, Centre National de Creation Musicale &
+ Aalborg University (Copenhagen, Denmark)
  ---------------------------------------------------------------------
  This Architecture section is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public License
@@ -20,6 +30,7 @@
  that work under terms of your choice, so long as this FAUST
  architecture section is not modified.
  
+ ************************************************************************
  ************************************************************************/
 
 #include "teensy.h"
@@ -35,6 +46,11 @@
 #include "faust/midi/teensy-midi.h"
 #endif
 
+// for polyphonic synths
+#ifdef NVOICES
+#include "faust/dsp/poly-dsp.h"
+#endif
+
 // we require macro declarations
 #define FAUST_UIMACROS
 
@@ -47,9 +63,25 @@
 #define FAUST_ADDVERTICALBARGRAPH(l,f,a,b)
 #define FAUST_ADDHORIZONTALBARGRAPH(l,f,a,b)
 
+/******************************************************************************
+ *******************************************************************************
+ 
+ VECTOR INTRINSICS
+ 
+ *******************************************************************************
+ *******************************************************************************/
+
 <<includeIntrinsic>>
 
+/********************END ARCHITECTURE SECTION (part 1/2)****************/
+
+/**************************BEGIN USER SECTION **************************/
+
 <<includeclass>>
+
+/***************************END USER SECTION ***************************/
+
+/*******************BEGIN ARCHITECTURE SECTION (part 2/2)***************/
 
 #define MULT_16 2147483647
 #define DIV_16 4.6566129e-10
@@ -64,7 +96,14 @@ ztimedmap GUI::gTimedZoneMap;
 
 AudioFaust::AudioFaust() : AudioStream(FAUST_INPUTS, new audio_block_t*[FAUST_INPUTS])
 {
+#ifdef NVOICES
+    int nvoices = NVOICES;
+    mydsp_poly* dsp_poly = new mydsp_poly(new mydsp(), nvoices, true, true);
+    fDSP = dsp_poly;
+#else
     fDSP = new mydsp();
+#endif
+    
     fDSP->init(AUDIO_SAMPLE_RATE_EXACT);
     
     fUI = new MapUI();
@@ -92,6 +131,9 @@ AudioFaust::AudioFaust() : AudioStream(FAUST_INPUTS, new audio_block_t*[FAUST_IN
     
 #if MIDICTRL
     fMIDIHandler = new teensy_midi();
+#ifdef NVOICES
+    fMIDIHandler->addMidiIn(dsp_poly);
+#endif
     fMIDIInterface = new MidiUI(fMIDIHandler);
     fDSP->buildUserInterface(fMIDIInterface);
     fMIDIInterface->run();
@@ -128,7 +170,7 @@ void AudioFaust::updateImp(void)
     
     if (INPUTS > 0) {
         audio_block_t* inBlock[INPUTS];
-        for(int channel = 0; channel < INPUTS; channel++) {
+        for (int channel = 0; channel < INPUTS; channel++) {
             inBlock[channel] = receiveReadOnly(channel);
             for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++) {
                 int32_t val = inBlock[channel]->data[i] << 16;
@@ -165,3 +207,5 @@ float AudioFaust::getParamValue(const std::string& path)
 {
     return fUI->getParamValue(path);
 }
+
+/********************END ARCHITECTURE SECTION (part 2/2)****************/

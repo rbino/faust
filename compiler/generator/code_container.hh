@@ -169,7 +169,7 @@ class CodeContainer : public virtual Garbageable {
         if (!fGeneratedSR) {
             pushDeclare(InstBuilder::genDecStructVar("fSampleRate", InstBuilder::genInt32Typed()));
         }
-        pushFrontInitMethod(
+        pushPreInitMethod(
             InstBuilder::genStoreStructVar("fSampleRate", InstBuilder::genLoadFunArgsVar("sample_rate")));
     }
 
@@ -348,10 +348,19 @@ class CodeContainer : public virtual Garbageable {
     template <typename REAL>
     string generateJSON()
     {
-        JSONInstVisitor<REAL> json_visitor;
-        generateUserInterface(&json_visitor);
-        generateMetaData(&json_visitor);
-        return json_visitor.JSON(true);
+        JSONInstVisitor<REAL> visitor;
+     
+        // Prepare compilation options
+        stringstream compile_options;
+        gGlobal->printCompilationOptions(compile_options);
+      
+        // "name", "filename" found in medata
+        visitor.init("", "", fNumInputs, fNumOutputs, -1, "", "", FAUSTVERSION, compile_options.str(),
+        gGlobal->gReader.listLibraryFiles(), gGlobal->gImportDirList, -1, std::map<std::string, int>());
+     
+        generateUserInterface(&visitor);
+        generateMetaData(&visitor);
+        return visitor.JSON(true);
     }
 
     DeclareFunInst* generateCalloc();
@@ -514,7 +523,7 @@ class CodeContainer : public virtual Garbageable {
         fPostInitInstructions->pushBackInst(inst);
         return inst;
     }
-    StatementInst* pushFrontInitMethod(StatementInst* inst)
+    StatementInst* pushPreInitMethod(StatementInst* inst)
     {
         fInitInstructions->pushFrontInst(inst);
         return inst;
@@ -570,9 +579,9 @@ class CodeContainer : public virtual Garbageable {
         return inst;
     }
 
-    StatementInst* pushComputePreDSPMethod(StatementInst* inst) { return fCurLoop->pushComputePreDSPMethod(inst); }
+    StatementInst* pushPreComputeDSPMethod(StatementInst* inst) { return fCurLoop->pushPreComputeDSPMethod(inst); }
     StatementInst* pushComputeDSPMethod(StatementInst* inst) { return fCurLoop->pushComputeDSPMethod(inst); }
-    StatementInst* pushComputePostDSPMethod(StatementInst* inst) { return fCurLoop->pushComputePostDSPMethod(inst); }
+    StatementInst* pushPostComputeDSPMethod(StatementInst* inst) { return fCurLoop->pushPostComputeDSPMethod(inst); }
 
     void generateSubContainers()
     {

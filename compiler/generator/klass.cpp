@@ -20,14 +20,14 @@
  ************************************************************************/
 
 /**********************************************************************
-           - klass.cpp : class C++ a remplir (projet FAUST) -
+        - klass.cpp : class C++ a remplir (projet FAUST) -
 
-       Historique :
-       -----------
-       17-10-2001 : implementation initiale (yo)
-       18-10-2001 : Ajout de getFreshID (yo)
-       02-11-2001 : Ajout de sous classes (yo)
-       06-11-2001 : modif impression des classes (yo)
+        Historique :
+        -----------
+        17-10-2001 : implementation initiale (yo)
+        18-10-2001 : Ajout de getFreshID (yo)
+        02-11-2001 : Ajout de sous classes (yo)
+        06-11-2001 : modif impression des classes (yo)
 
 ***********************************************************************/
 
@@ -967,6 +967,14 @@ void Klass::println(int n, ostream& fout)
         tab(n, fout);
         fout << "#ifdef FAUST_UIMACROS";
         tab(n + 1, fout);
+        tab(n + 1, fout);
+        for (auto& it : gGlobal->gMetaDataSet) {
+            if (it.first == tree("filename")) {
+                fout << "#define FAUST_FILE_NAME " << **(it.second.begin());
+                break;
+            }
+        }
+        tab(n + 1, fout);
         fout << "#define FAUST_CLASS_NAME " << "\"" << fKlassName << "\"";
         tab(n + 1, fout);
         fout << "#define FAUST_INPUTS " << fNumInputs;
@@ -1434,7 +1442,7 @@ void SigIntGenKlass::println(int n, ostream& fout)
     fout << "}";
 
     tab(n + 1, fout);
-    fout << "void fill (int count, int output[]) {";
+    fout << "void fill(int count, int output[]) {";
     printlines(n + 2, fZone1Code, fout);
     printlines(n + 2, fZone2Code, fout);
     printlines(n + 2, fZone2bCode, fout);
@@ -1484,7 +1492,7 @@ void SigFloatGenKlass::println(int n, ostream& fout)
     fout << "}";
 
     tab(n + 1, fout);
-    fout << subst("void fill (int count, $0 output[]) {", ifloat());
+    fout << subst("void fill(int count, $0 output[]) {", ifloat());
     printlines(n + 2, fZone1Code, fout);
     printlines(n + 2, fZone2Code, fout);
     printlines(n + 2, fZone2bCode, fout);

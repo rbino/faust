@@ -30,10 +30,12 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <string.h>
 #include <map>
 #include <algorithm>
 
-#include <soul/API/soul_patch.h>
+#include <soul/soul_patch.h>
+#include <soul/patch/helper_classes/soul_patch_Utilities.h>
 
 #include "faust/dsp/dsp.h"
 #include "faust/midi/midi.h"
@@ -51,6 +53,15 @@ class soulpatch_dsp : public dsp {
     
     private:
     
+        struct ConsolePrinter : public soul::patch::RefCountHelper<soul::patch::ConsoleMessageHandler, ConsolePrinter>
+        {
+            /** Called when a message is sent to the console by the program. */
+            void handleConsoleMessage(uint64_t sampleCount, const char* endpointName, const char* message)
+            {
+                std::cout << sampleCount << " " << endpointName << ": " << message << std::endl;
+            }
+        };
+
         bool startWith(const std::string& str, const std::string& prefix)
         {
             return (str.substr(0, prefix.size()) == prefix);
@@ -96,7 +107,7 @@ class soulpatch_dsp : public dsp {
         std::vector<ZoneParam*> fInputsControl;
         std::vector<ZoneParam*> fOutputsControl;
     
-        soul::patch::PatchPlayer::Ptr fPlayer;
+        soul::patch::PatchPlayer* fPlayer;
         soul::patch::PatchPlayerConfiguration fConfig;
         soul::patch::PatchPlayer::RenderContext fRenderContext;
     
@@ -182,7 +193,7 @@ class soulpatch_dsp : public dsp {
                         for (int j = 0; j < names.size(); j++) {
                             std::string key = names[j];
                             if (key == "unit") {
-                                ui_interface->declare(zone, key.c_str(), params[i]->getProperty(names[j]));
+                                ui_interface->declare(zone, key.c_str(), params[i]->getProperty(names[j])->getCharPointer());
                             }
                         }
                         
@@ -194,6 +205,7 @@ class soulpatch_dsp : public dsp {
                                                               params[i]->maxValue, params[i]->step);
                         }
                     }
+                    
                     ui_interface->closeBox();
                 }
                 {
@@ -212,10 +224,10 @@ class soulpatch_dsp : public dsp {
                         for (int j = 0; j < names.size(); j++) {
                             std::string key = names[j];
                             if (key == "unit") {
-                                ui_interface->declare(zone, key.c_str(), params[i]->getProperty(names[j]));
+                                ui_interface->declare(zone, key.c_str(), params[i]->getProperty(names[j])->getCharPointer());
                             }
                         }
-                        if !(checkParam(params[i]->getPropertyNames(), "hidden")) {
+                        if (!(checkParam(params[i]->getPropertyNames(), "hidden"))) {
                             ui_interface->addVerticalBargraph(params[i]->name->getCharPointer(), zone, params[i]->minValue, params[i]->maxValue);
                         }
                     }
@@ -289,10 +301,14 @@ class soulpatch_dsp : public dsp {
                 fRenderContext.outgoingMIDI = std::addressof(fMIDIOutputMessages[0]);
                 fRenderContext.maximumMIDIMessagesOut = (uint32_t)fMIDIOutputMessages.size();
                 fRenderContext.numMIDIMessagesOut = 0;
+            } else {
+                fRenderContext.incomingMIDI = nullptr;
+                fRenderContext.incomingMIDI = nullptr;
+                fRenderContext.numMIDIMessagesIn = 0;
             }
         
             // Setup audio buffers
-            fRenderContext.inputChannels = (const float**)inputs;
+            fRenderContext.inputChannels = (const FAUSTFLOAT**)inputs;
             fRenderContext.outputChannels = outputs;
             fRenderContext.numFrames = count;
             
@@ -336,13 +352,13 @@ class soul_dsp_factory : public dsp_factory {
     
         struct FaustSOULFile : public soul::patch::VirtualFile {
             
-            virtual soul::patch::String::Ptr getName() { return {}; }
+            virtual soul::patch::String* getName() { return {}; }
             
-            virtual soul::patch::String::Ptr getAbsolutePath() { return {}; }
+            virtual soul::patch::String* getAbsolutePath() { return {}; }
             
-            virtual soul::patch::VirtualFile::Ptr getParent() { return {}; }
+            virtual soul::patch::VirtualFile* getParent() { return {}; }
             
-            virtual soul::patch::VirtualFile::Ptr getChildFile (const char* subPath) { return {}; }
+            virtual soul::patch::VirtualFile* getChildFile (const char* subPath) { return {}; }
             
             virtual int64_t getSize() { return 0; }
             
@@ -354,7 +370,7 @@ class soul_dsp_factory : public dsp_factory {
     
         struct FaustSourceFilePreprocessor : public soul::patch::SourceFilePreprocessor {
             
-            virtual soul::patch::VirtualFile::Ptr preprocessSourceFile (soul::patch::VirtualFile& inputFile) override
+            virtual soul::patch::VirtualFile* preprocessSourceFile (soul::patch::VirtualFile& inputFile) override
             {
                 return {};
             }
@@ -363,7 +379,7 @@ class soul_dsp_factory : public dsp_factory {
     
         std::string fPath;
         soul::patch::PatchInstance::Ptr fPatch;
-        soul::patch::Description fDescription;
+        soul::patch::Description* fDescription;
         FaustSourceFilePreprocessor::Ptr fProcessor;
     
     public:
@@ -398,7 +414,7 @@ class soul_dsp_factory : public dsp_factory {
     
         virtual ~soul_dsp_factory() {}
         
-        virtual std::string getName() { return fDescription.name; }
+        virtual std::string getName() { return fDescription->name; }
         virtual std::string getSHAKey() { return ""; }
         virtual std::string getDSPCode() { return ""; }
         virtual std::string getCompileOptions() { return ""; }
@@ -421,6 +437,7 @@ soulpatch_dsp::soulpatch_dsp(soul_dsp_factory* factory, std::string& error_msg)
     fFactory = factory;
     fDecoder = nullptr;
     fMIDIHander = nullptr;
+    memset(&fRenderContext, 0, sizeof(fRenderContext));
     
     fConfig.sampleRate = 44100;
     fConfig.maxFramesPerBlock = 4096;
@@ -445,6 +462,7 @@ void soulpatch_dsp::init(int sample_rate)
 {
     fConfig.sampleRate = double(sample_rate);
     fPlayer = fFactory->fPatch->compileNewPlayer(fConfig, nullptr, fFactory->fProcessor.get(), nullptr, nullptr);
+    //fPlayer = fFactory->fPatch->compileNewPlayer(fConfig, nullptr, fFactory->fProcessor.get(), nullptr, new ConsolePrinter());
     fMIDIInputMessages.resize(1024);
     fMIDIOutputMessages.resize(1024);
     

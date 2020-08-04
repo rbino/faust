@@ -132,7 +132,7 @@ using namespace std;
 #define ASSIST_INLET 	1
 #define ASSIST_OUTLET 	2
 
-#define EXTERNAL_VERSION    "0.75"
+#define EXTERNAL_VERSION    "0.79"
 #define STR_SIZE            512
 
 #include "faust/gui/GUI.h"
@@ -198,7 +198,37 @@ void faust_allocate(t_faust* x, int nvoices)
 #endif
     } else {
         post("monophonic DSP");
-        x->m_dsp = new mydsp();
+        #if (DOWN_SAMPLING > 0)
+            #if (FILTER_TYPE == 0)
+                x->m_dsp = new dsp_down_sampler<Identity<Double<1,1>, DOWN_SAMPLING>>(new mydsp());
+            #elif (FILTER_TYPE == 1)
+                x->m_dsp = new dsp_down_sampler<LowPass3<Double<45,100>, DOWN_SAMPLING, double>>(new mydsp());
+            #elif (FILTER_TYPE == 2)
+                x->m_dsp = new dsp_down_sampler<LowPass4<Double<45,100>, DOWN_SAMPLING, double>>(new mydsp());
+            #elif (FILTER_TYPE == 3)
+                x->m_dsp = new dsp_down_sampler<LowPass3e<Double<45,100>, DOWN_SAMPLING, double>>(new mydsp());
+            #elif (FILTER_TYPE == 4)
+                x->m_dsp = new dsp_down_sampler<LowPass6eé<Double<45,100>, DOWN_SAMPLING, double>>(new mydsp());
+            #else
+                #error "ERROR : Filter type must be in [0..4] range"
+            #endif
+        #elif (UP_SAMPLING > 0)
+            #if (FILTER_TYPE == 0)
+                x->m_dsp = new dsp_up_sampler<Identity<Double<1,1>, UP_SAMPLING>>(new mydsp());
+            #elif (FILTER_TYPE == 1)
+                x->m_dsp = new dsp_up_sampler<LowPass3<Double<45,100>, UP_SAMPLING, double>>(new mydsp());
+            #elif (FILTER_TYPE == 2)
+                x->m_dsp = new dsp_up_sampler<LowPass4<Double<45,100>, UP_SAMPLING, double>>(new mydsp());
+            #elif (FILTER_TYPE == 3)
+                x->m_dsp = new dsp_up_sampler<LowPass3e<Double<45,100>, UP_SAMPLING, double>>(new mydsp());
+            #elif (FILTER_TYPE == 4)
+                x->m_dsp = new dsp_up_sampler<LowPass6e<Double<45,100>, UP_SAMPLING, double>>(new mydsp());
+            #else
+                #error "ERROR : Filter type must be in [0..4] range"
+            #endif
+        #else
+            x->m_dsp = new mydsp();
+        #endif
     }
     
 #ifdef MIDICTRL
@@ -565,8 +595,7 @@ void faust_init(t_faust* x, t_symbol* s, short ac, t_atom* av)
 }
 
 /*--------------------------------------------------------------------------*/
-// Dump controllers as list of: [path, cur, min, max]
-void faust_dump(t_faust* x, t_symbol* s, short ac, t_atom* av)
+void faust_dump_inputs(t_faust* x)
 {
     // Input controllers
     for (mspUI::iterator it = x->m_dspUI->begin2(); it != x->m_dspUI->end2(); it++) {
@@ -577,6 +606,11 @@ void faust_dump(t_faust* x, t_symbol* s, short ac, t_atom* av)
         atom_setfloat(&myList[3], (*it).second->getMaxValue());
         outlet_list(x->m_control_outlet, 0, 4, myList);
     }
+}
+
+/*--------------------------------------------------------------------------*/
+void faust_dump_outputs(t_faust* x)
+{
     // Output controllers
     for (mspUI::iterator it = x->m_dspUI->begin4(); it != x->m_dspUI->end4(); it++) {
         t_atom myList[4];
@@ -586,6 +620,14 @@ void faust_dump(t_faust* x, t_symbol* s, short ac, t_atom* av)
         atom_setfloat(&myList[3], (*it).second->getMaxValue());
         outlet_list(x->m_control_outlet, 0, 4, myList);
     }
+}
+
+/*--------------------------------------------------------------------------*/
+// Dump controllers as list of [path, cur, min, max]
+void faust_dump(t_faust* x, t_symbol* s, short ac, t_atom* av)
+{
+    faust_dump_inputs(x);
+    faust_dump_outputs(x);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -661,7 +703,9 @@ t_int* faust_perform(t_int* w)
         #ifdef OSCCTRL
             if (x->m_oscInterface) x->m_oscInterface->endBundle();
         #endif
-            faust_update_outputs(x);
+            //faust_update_outputs(x);
+            // Use the right outlet to output messages
+            faust_dump_outputs(x);
         }
     #if defined(MIDICTRL) || defined(OSCCTRL)
         GUI::updateAllGuis();
@@ -706,7 +750,9 @@ extern "C" int main(void)
 void ext_main(void* r)
 #endif
 {
-    string class_name = string(FAUST_CLASS_NAME) + "~";
+    string file_name = string(FAUST_FILE_NAME);
+    // Remove ".dsp" ending
+    string class_name = file_name.erase(file_name.size()-4) + "~";
     t_class* c = class_new(class_name.c_str(), (method)faust_new, (method)faust_free, sizeof(t_faust), 0L, A_DEFFLOAT, 0);
     
     class_addmethod(c, (method)faust_anything, "anything", A_GIMME, 0);
@@ -729,8 +775,7 @@ void ext_main(void* r)
     tmp_dsp->buildUserInterface(&tmp_UI);
     
     // Setup attribute
-    int i = 0;
-    for (mspUI::iterator it = tmp_UI.begin1(); it != tmp_UI.end1(); it++, i++) {
+    for (mspUI::iterator it = tmp_UI.begin1(); it != tmp_UI.end1(); it++) {
         CLASS_ATTR_FLOAT(c, (*it).first.c_str(), 0, t_faust, m_ob);
         CLASS_ATTR_ACCESSORS(c, (*it).first.c_str(), NULL, (method)faust_attr_set);
     }
