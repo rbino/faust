@@ -25,10 +25,6 @@
 
 #include <string>
 #include <iostream>
-#include <sstream>
-#include <fstream>
-#include <sys/types.h>
-#include <sys/sysctl.h>
 #include <assert.h>
 
 // CPUs
@@ -84,7 +80,7 @@
 
 /*
     A DSP decorator that loads the CPU optimised version of the code and instantiate it.
-    This file ise used by the 'faust2object' tool to produce several CPU specific .h and .o files,
+    This file is used by the 'faust2object' tool to produce several CPU specific .h and .o files,
     to be compiled and linked with the mydspmulti class.
  
     // To test: c++ -std=c++11 FOOmulti.cpp -I `llvm-config --includedir` `llvm-config --ldflags --libs all --system-libs` FOO*.o -dead_strip -o FOOmulti
@@ -210,7 +206,6 @@ dsp* createmydspmulti() { return new mydspmulti(); }
 #endif
 /**************************  END  llvm-dsp-multi.h **************************/
 
-//#define TEST
 #ifdef TEST
 int main()
 {
