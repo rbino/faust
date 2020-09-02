@@ -43,7 +43,7 @@
 #if defined(JUCE_32BIT) || defined(JUCE_64BIT)
 #include "faust/gui/JuceReader.h"
 JuceReader gReader;
-#elif defined(ESP32)
+#elif defined(ESP32) || defined(DAISY)
 #include "faust/gui/WaveReader.h"
 WaveReader gReader;
 #elif defined(MEMORY_READER)
