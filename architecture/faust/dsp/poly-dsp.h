@@ -568,13 +568,17 @@ class mydsp_poly : public dsp_voice_group, public dsp_poly {
             
                 // Then decide which one to steal
                 if (oldest_date_release != INT_MAX) {
-                    std::cout << "Steal release voice : voice_date " << fVoiceTable[voice_release]->fDate;
-                    std::cout << " cur_date = " << fDate << " voice = " << voice_release << std::endl;
+                    fprintf(stderr, "Steal release voice : voice_date = %d cur_date = %d voice = %d \n",
+                            fVoiceTable[voice_release]->fDate,
+                            fDate,
+                            voice_release);
                     voice = voice_release;
                     goto result;
                 } else if (oldest_date_playing != INT_MAX) {
-                    std::cout << "Steal playing voice : voice_date " << fVoiceTable[voice_playing]->fDate;
-                    std::cout << " cur_date = " << fDate << " voice = " << voice_playing << std::endl;
+                    fprintf(stderr, "Steal playing voice : voice_date = %d cur_date = %d voice = %d \n",
+                            fVoiceTable[voice_release]->fDate,
+                            fDate,
+                            voice_release);
                     voice = voice_playing;
                     goto result;
                 } else {
@@ -601,7 +605,7 @@ class mydsp_poly : public dsp_voice_group, public dsp_poly {
             if (fVoiceTable.size() > 0) {
                 return true;
             } else {
-                std::cout << "DSP is not polyphonic...\n";
+                fprintf(stderr, "DSP is not polyphonic...\n");
                 return false;
             }
         }
@@ -783,7 +787,7 @@ class mydsp_poly : public dsp_voice_group, public dsp_poly {
             if (it != fVoiceTable.end()) {
                 (*it)->keyOff();
             } else {
-                std::cout << "Voice not found\n";
+                fprintf(stderr, "Voice not found\n");
             }
         }
     
@@ -810,7 +814,7 @@ class mydsp_poly : public dsp_voice_group, public dsp_poly {
                 if (voice != kNoVoice) {
                     fVoiceTable[voice]->keyOff();
                 } else {
-                    std::cout << "Playing pitch = " << pitch << " not found\n";
+                    fprintf(stderr, "Playing pitch = %d not found\n", pitch);
                 }
             }
         }
